@@ -115,6 +115,19 @@
   .search-item:last-child { border-bottom: none; }
   .search-item:hover { background: var(--accent-soft); }
   .search-item .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .dict-badge {
+    display: inline-block; margin-left: 6px; padding: 1px 7px;
+    border-radius: 8px; background: var(--accent-soft); color: var(--accent);
+    font-size: 10.5px; font-weight: 700; vertical-align: 1px;
+  }
+  .preview-marker {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: #fffdf7;
+    border: 2.5px dashed var(--accent2);
+    box-shadow: 0 2px 6px rgba(60,50,38,.3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
 
   .btn {
     min-height: 36px;
@@ -821,6 +834,16 @@ const LEGACY_COLOR_MAP = {
 function migrateColors(days) {
   (days || []).forEach(d => { if (LEGACY_COLOR_MAP[d.color]) d.color = LEGACY_COLOR_MAP[d.color]; });
 }
+/* 第 17 天起調色盤循環時逐輪加深 15%，長行程不撞色 */
+function dayColorAt(i) {
+  const base = DAY_COLORS[i % DAY_COLORS.length];
+  const round = Math.floor(i / DAY_COLORS.length);
+  if (!round) return base;
+  const n = parseInt(base.slice(1), 16);
+  const f = Math.max(.4, 1 - .15 * round);
+  const r = Math.round(((n >> 16) & 255) * f), g = Math.round(((n >> 8) & 255) * f), b = Math.round((n & 255) * f);
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
 const STOP_TYPES = [
   ['📍','景點'], ['🍽️','美食'], ['☕','咖啡'], ['🛏️','住宿'],
   ['🚗','交通'], ['🛒','購物'], ['🎯','活動'], ['⛽','補給'],
@@ -1443,7 +1466,7 @@ map.on('click', e => {
     .then(r => r.json())
     .then(d => {
       const n = d.name || (d.address && (d.address.attraction || d.address.tourism || d.address.amenity || d.address.road || d.address.suburb || d.address.city)) || '';
-      addStop(lat, lng, n || `(${lat.toFixed(4)}, ${lng.toFixed(4)})`);
+      addStop(lat, lng, n ? s2t(n) : `(${lat.toFixed(4)}, ${lng.toFixed(4)})`);
     })
     .catch(() => addStop(lat, lng, `(${lat.toFixed(4)}, ${lng.toFixed(4)})`));
 });
@@ -1461,34 +1484,158 @@ document.addEventListener('click', e => {
   if (!e.target.closest('#searchWrap')) searchResults.style.display = 'none';
 });
 
+/* 簡體 → 繁體（成對字串：偶數位簡體、奇數位繁體），修正 OSM 回傳的簡體地名 */
+const S2T = '镇鎮湾灣岛島库庫尔爾兰蘭罗羅奥奧纳納维維灵靈顿頓汉漢铁鐵桥橋门門广廣场場区區县縣泽澤东東长長龙龍凤鳳岭嶺滩灘园園动動馆館爱愛旧舊亚亞双雙丽麗内內几幾贝貝红紅气氣温溫别別边邊达達冈岡观觀视視觉覺发發号號峡峽录錄营營术術缆纜车車马馬鸟鳥风風云雲电電头頭点點线線码碼里裡纪紀谷谷冰冰湖湖顶頂机機场場莱萊丹丹德德';
+function s2t(str) {
+  let out = '';
+  for (const ch of (str || '')) {
+    const i = S2T.indexOf(ch);
+    out += (i >= 0 && i % 2 === 0) ? S2T[i + 1] : ch;
+  }
+  return out;
+}
+
+/* 紐西蘭景點中文字典：中文搜國外景點 Nominatim 幾乎查不到，先查這裡 */
+const NZ_POI = [
+  { n: ['皇后鎮', '皇后镇', 'queenstown'], en: 'Queenstown', lat: -45.0312, lng: 168.6626, z: 13 },
+  { n: ['天空纜車', '天空缆车', '皇后鎮天空纜車', 'skyline'], en: 'Skyline Queenstown', lat: -45.0242, lng: 168.6535, z: 15 },
+  { n: ['皇后鎮花園'], en: 'Queenstown Gardens', lat: -45.0378, lng: 168.6644, z: 15 },
+  { n: ['費格漢堡', 'fergburger'], en: 'Fergburger', lat: -45.0312, lng: 168.6605, z: 16 },
+  { n: ['箭鎮', '箭镇', 'arrowtown'], en: 'Arrowtown', lat: -44.9387, lng: 168.8348, z: 14 },
+  { n: ['卡瓦勞大橋', '高空彈跳橋', '卡瓦勞橋'], en: 'Kawarau Bridge Bungy', lat: -45.0091, lng: 168.8555, z: 15 },
+  { n: ['海斯湖', '哈耶斯湖'], en: 'Lake Hayes', lat: -44.9917, lng: 168.809, z: 14 },
+  { n: ['格萊諾基', '格倫諾奇', 'glenorchy'], en: 'Glenorchy', lat: -44.8494, lng: 168.3832, z: 13 },
+  { n: ['瓦納卡', '瓦纳卡', 'wanaka'], en: 'Wanaka', lat: -44.7032, lng: 169.1321, z: 13 },
+  { n: ['瓦納卡樹', '孤獨的樹', '瓦納卡湖樹'], en: 'That Wanaka Tree', lat: -44.6982, lng: 169.1183, z: 16 },
+  { n: ['克倫威爾', '克伦威尔', 'cromwell'], en: 'Cromwell', lat: -45.0383, lng: 169.1968, z: 13 },
+  { n: ['蒂卡波', '提卡坡', '特卡波', '蒂卡波湖', 'tekapo'], en: 'Lake Tekapo', lat: -44.0046, lng: 170.4771, z: 13 },
+  { n: ['好牧羊人教堂', '牧羊人教堂'], en: 'Church of the Good Shepherd', lat: -44.0033, lng: 170.4772, z: 16 },
+  { n: ['約翰山', '約翰山天文台'], en: 'Mt John Observatory', lat: -43.9856, lng: 170.4653, z: 15 },
+  { n: ['普卡基湖', '普卡奇湖'], en: 'Lake Pukaki', lat: -44.1899, lng: 170.1339, z: 12 },
+  { n: ['庫克山', '库克山', '奧拉基', 'mount cook', 'aoraki'], en: 'Aoraki / Mount Cook', lat: -43.7355, lng: 170.0982, z: 12 },
+  { n: ['胡克谷步道', '胡克步道'], en: 'Hooker Valley Track', lat: -43.719, lng: 170.092, z: 14 },
+  { n: ['塔斯曼冰川', '塔斯曼冰河'], en: 'Tasman Glacier', lat: -43.6785, lng: 170.2088, z: 13 },
+  { n: ['特威澤爾', '特威泽尔', 'twizel'], en: 'Twizel', lat: -44.2597, lng: 170.1005, z: 13 },
+  { n: ['基督城', 'christchurch'], en: 'Christchurch', lat: -43.5321, lng: 172.6362, z: 12 },
+  { n: ['紙教堂', '紙板教堂'], en: 'Cardboard Cathedral', lat: -43.5338, lng: 172.6421, z: 16 },
+  { n: ['阿卡羅阿', '阿卡罗阿', 'akaroa'], en: 'Akaroa', lat: -43.8035, lng: 172.9683, z: 13 },
+  { n: ['但尼丁', '達尼丁', 'dunedin'], en: 'Dunedin', lat: -45.8788, lng: 170.5028, z: 12 },
+  { n: ['但尼丁火車站'], en: 'Dunedin Railway Station', lat: -45.8759, lng: 170.5083, z: 16 },
+  { n: ['摩拉基大圓石', '摩伊拉基大圓石', '摩拉基巨石'], en: 'Moeraki Boulders', lat: -45.3454, lng: 170.8266, z: 15 },
+  { n: ['鮑德溫街', '世界最陡街道'], en: 'Baldwin Street', lat: -45.8499, lng: 170.5352, z: 16 },
+  { n: ['奧塔哥半島', '奥塔哥半岛'], en: 'Otago Peninsula', lat: -45.809, lng: 170.656, z: 12 },
+  { n: ['隧道海灘'], en: 'Tunnel Beach', lat: -45.9186, lng: 170.4634, z: 15 },
+  { n: ['米佛峽灣', '米爾福德峽灣', '米尔福德峡湾', 'milford'], en: 'Milford Sound', lat: -44.6717, lng: 167.925, z: 12 },
+  { n: ['神奇峽灣', '道特富爾峽灣'], en: 'Doubtful Sound', lat: -45.274, lng: 166.993, z: 11 },
+  { n: ['蒂阿瑙', '蒂阿瑙湖', 'te anau'], en: 'Te Anau', lat: -45.4145, lng: 167.718, z: 13 },
+  { n: ['福克斯冰川', '福克斯冰河', 'fox glacier'], en: 'Fox Glacier', lat: -43.4644, lng: 170.0176, z: 13 },
+  { n: ['法蘭士約瑟夫冰川', '法蘭茲約瑟夫', '弗朗茨約瑟夫'], en: 'Franz Josef Glacier', lat: -43.389, lng: 170.183, z: 13 },
+  { n: ['鬆餅岩', '煎餅岩', '蓬納凱基'], en: 'Punakaiki Pancake Rocks', lat: -42.114, lng: 171.326, z: 15 },
+  { n: ['亞瑟隘口', '亞瑟通道'], en: "Arthur's Pass", lat: -42.942, lng: 171.564, z: 13 },
+  { n: ['格雷茅斯', 'greymouth'], en: 'Greymouth', lat: -42.45, lng: 171.207, z: 13 },
+  { n: ['霍基蒂卡', 'hokitika'], en: 'Hokitika', lat: -42.717, lng: 170.967, z: 13 },
+  { n: ['尼爾森', '尼尔森', 'nelson'], en: 'Nelson', lat: -41.2706, lng: 173.284, z: 13 },
+  { n: ['亞伯塔斯曼', '亞伯塔斯曼國家公園'], en: 'Abel Tasman National Park', lat: -40.933, lng: 172.967, z: 11 },
+  { n: ['皮克頓', '皮克顿', 'picton'], en: 'Picton', lat: -41.2906, lng: 174.0011, z: 13 },
+  { n: ['凱庫拉', '凯库拉', 'kaikoura'], en: 'Kaikoura', lat: -42.4, lng: 173.68, z: 13 },
+  { n: ['奧克蘭', '奥克兰', 'auckland'], en: 'Auckland', lat: -36.8485, lng: 174.7633, z: 12 },
+  { n: ['天空塔', '奧克蘭天空塔', 'sky tower'], en: 'Sky Tower', lat: -36.8484, lng: 174.7622, z: 16 },
+  { n: ['威靈頓', '威灵顿', 'wellington'], en: 'Wellington', lat: -41.2865, lng: 174.7762, z: 12 },
+  { n: ['羅托魯瓦', '羅托魯阿', '罗托鲁瓦', 'rotorua'], en: 'Rotorua', lat: -38.1368, lng: 176.2497, z: 13 },
+  { n: ['螢火蟲洞', '懷托摩', '懷托摩螢火蟲洞'], en: 'Waitomo Glowworm Caves', lat: -38.261, lng: 175.103, z: 14 },
+  { n: ['哈比屯', '哈比村', '霍比屯', 'hobbiton'], en: 'Hobbiton Movie Set', lat: -37.8721, lng: 175.6829, z: 15 },
+  { n: ['陶波', '陶波湖', 'taupo'], en: 'Taupo', lat: -38.6857, lng: 176.0702, z: 12 },
+  { n: ['胡卡瀑布'], en: 'Huka Falls', lat: -38.6494, lng: 176.0893, z: 15 },
+  { n: ['東加里羅', '東加里羅國家公園'], en: 'Tongariro National Park', lat: -39.2, lng: 175.5833, z: 11 },
+  { n: ['島嶼灣', '群島灣'], en: 'Bay of Islands', lat: -35.227, lng: 174.158, z: 11 },
+  { n: ['派希亞', 'paihia'], en: 'Paihia', lat: -35.282, lng: 174.091, z: 14 },
+  { n: ['教堂灣', '大教堂灣'], en: 'Cathedral Cove', lat: -36.8277, lng: 175.7906, z: 15 },
+  { n: ['懷歐塔普', '地熱世界'], en: 'Wai-O-Tapu', lat: -38.356, lng: 176.368, z: 14 },
+  { n: ['納皮爾', 'napier'], en: 'Napier', lat: -39.4928, lng: 176.912, z: 13 },
+  { n: ['瑪塔瑪塔', 'matamata'], en: 'Matamata', lat: -37.809, lng: 175.773, z: 13 }
+];
+function searchLocalDict(qRaw) {
+  const q = qRaw.trim().toLowerCase().replace(/\s+/g, '');
+  if (q.length < 2) return [];
+  const scored = [];
+  NZ_POI.forEach(p => {
+    let s = 0;
+    for (const alias of p.n) {
+      const a = alias.toLowerCase().replace(/\s+/g, '');
+      if (a === q) { s = 3; break; }
+      if (a.includes(q) || q.includes(a)) s = Math.max(s, 2);
+    }
+    if (s) scored.push([s, p]);
+  });
+  return scored.sort((x, y) => y[0] - x[0]).slice(0, 6).map(x => x[1]);
+}
+
+/* 搜尋結果：先預覽、按了「加入」才進行程（不再強迫加點） */
+let previewMarker = null;
+window.__addPreview = function () {
+  const p = window.__previewData;
+  const mk = previewMarker;
+  previewMarker = null;
+  if (mk) map.removeLayer(mk);
+  if (p) addStop(p.lat, p.lng, p.name);
+  return false;
+};
+function showPreview(lat, lng, name) {
+  if (previewMarker) { map.removeLayer(previewMarker); previewMarker = null; }
+  window.__previewData = { lat, lng, name };
+  const icon = L.divIcon({
+    className: '',
+    html: `<div class="preview-marker">📍</div>`,
+    iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -17]
+  });
+  const mk = L.marker([lat, lng], { icon }).addTo(map);
+  mk.bindPopup(`<b>${esc(name)}</b><br><a href="#" onclick="return __addPreview()">➕ 加入行程</a>`).openPopup();
+  mk.on('popupclose', () => {
+    if (previewMarker === mk) { previewMarker = null; map.removeLayer(mk); }
+  });
+  previewMarker = mk;
+}
+
+function appendSearchItem(main, sub, lat, lng, zoom, isDict) {
+  const item = document.createElement('div');
+  item.className = 'search-item';
+  item.innerHTML = `<div><b>${esc(main)}</b>${isDict ? '<span class="dict-badge">精選</span>' : ''}</div><div class="sub">${esc(sub)}</div>`;
+  item.addEventListener('click', () => {
+    map.setView([lat, lng], zoom || 14);
+    showPreview(lat, lng, main);
+    searchResults.style.display = 'none';
+    searchInput.value = '';
+  });
+  searchResults.appendChild(item);
+}
+
 function doSearch(q) {
   if (!q) return;
-  searchResults.innerHTML = '<div class="search-item">搜尋中…</div>';
+  searchResults.innerHTML = '';
   searchResults.style.display = 'block';
-  fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=8&accept-language=zh-TW`)
+  // 1) 內建紐西蘭景點字典（中文 OK、即時）
+  const dictHits = searchLocalDict(q);
+  dictHits.forEach(p => appendSearchItem(p.n[0], `${p.en}・紐西蘭`, p.lat, p.lng, p.z, true));
+  // 2) OpenStreetMap 全球搜尋
+  const loading = document.createElement('div');
+  loading.className = 'search-item';
+  loading.textContent = '🌐 全球搜尋中…';
+  searchResults.appendChild(loading);
+  fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=6&accept-language=zh-TW`)
     .then(r => r.json())
     .then(results => {
-      if (!results.length) {
-        searchResults.innerHTML = '<div class="search-item">找不到結果，換個關鍵字試試（建議加上城市名）</div>';
-        return;
-      }
-      searchResults.innerHTML = '';
+      loading.remove();
       results.forEach(r => {
-        const item = document.createElement('div');
-        item.className = 'search-item';
-        const shortName = r.display_name.split(',')[0];
-        item.innerHTML = `<div><b>${esc(shortName)}</b></div><div class="sub">${esc(r.display_name)}</div>`;
-        item.addEventListener('click', () => {
-          const lat = +r.lat, lng = +r.lon;
-          map.setView([lat, lng], 14);
-          addStop(lat, lng, shortName);
-          searchResults.style.display = 'none';
-          searchInput.value = '';
-        });
-        searchResults.appendChild(item);
+        appendSearchItem(s2t(r.display_name.split(',')[0]), s2t(r.display_name), +r.lat, +r.lon, 14, false);
       });
+      if (!dictHits.length && !results.length) {
+        searchResults.innerHTML = `<div class="search-item">找不到「${esc(q)}」。國外景點試試<b>英文名稱</b>（例：Skyline Queenstown），或直接在地圖上點選位置</div>`;
+      }
     })
-    .catch(() => { searchResults.innerHTML = '<div class="search-item">搜尋失敗，請檢查網路</div>'; });
+    .catch(() => {
+      loading.remove();
+      if (!dictHits.length) searchResults.innerHTML = '<div class="search-item">搜尋失敗，請檢查網路</div>';
+    });
 }
 
 /* ============ Google Maps 導航連結 ============ */
@@ -1526,7 +1673,7 @@ document.getElementById('addDayBtn').addEventListener('click', () => {
   const day = {
     id: uid(),
     name: `Day ${state.days.length + 1}`,
-    color: DAY_COLORS[state.days.length % DAY_COLORS.length],
+    color: dayColorAt(state.days.length),
     visible: true,
     stops: []
   };
@@ -1812,6 +1959,7 @@ function buildTripText() {
   return lines.join('\n').trim();
 }
 document.getElementById('copyTextBtn').addEventListener('click', () => {
+  if (!state.days.some(d => d.stops.length)) { toast('行程還是空的，先加幾個地點吧'); return; }
   const text = buildTripText();
   if (!text) { toast('目前沒有行程內容'); return; }
   track('copy_text');
