@@ -741,7 +741,8 @@ if (SITE_CONFIG.analyticsId) {
 // 聯盟連結點擊統計（含動態產生的 popup 連結）
 document.addEventListener('click', e => {
   const a = e.target.closest('a[data-aff]');
-  if (a) track('affiliate_click', { platform: a.dataset.aff });
+  // partner 對齊 GA 資源既有的「Affiliate Partner」自訂維度，與 shinshing.tw 部落格數據同一套報表
+  if (a) track('affiliate_click', { partner: a.dataset.aff, cta_position: 'planner-tools' });
 });
 
 /* ============ 狀態 ============ */
