@@ -284,6 +284,7 @@
 
   /* ===== Map ===== */
   #map { flex: 1; min-width: 0; z-index: 1; }
+  .marker-wrap { position: relative; width: 28px; height: 28px; }
   .num-marker {
     width: 28px; height: 28px; border-radius: 50% 50% 50% 0;
     transform: rotate(-45deg);
@@ -294,7 +295,17 @@
   .num-marker span {
     transform: rotate(45deg);
     color: #fff; font-size: 12px; font-weight: 700;
-    font-family: "Segoe UI", sans-serif;
+    font-family: "Noto Sans TC", "Segoe UI", sans-serif;
+  }
+  .num-marker span.emoji { font-size: 13px; line-height: 1; }
+  .num-badge {
+    position: absolute; top: -7px; right: -9px;
+    min-width: 15px; height: 15px; padding: 0 3px;
+    border-radius: 8px; background: #fff;
+    font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,.35);
+    font-family: "Noto Sans TC", "Segoe UI", sans-serif;
   }
 
   #hint {
@@ -826,9 +837,16 @@ function renderMap() {
     if (!day.visible) return;
     // 標記
     day.stops.forEach((stop, i) => {
+      const t = stop.type || '📍';
+      const typed = t !== '📍';
       const icon = L.divIcon({
         className: '',
-        html: `<div class="num-marker" style="background:${day.color}"><span>${i + 1}</span></div>`,
+        html: `<div class="marker-wrap">` +
+          `<div class="num-marker" style="background:${day.color}">` +
+          (typed ? `<span class="emoji">${esc(t)}</span>` : `<span>${i + 1}</span>`) +
+          `</div>` +
+          (typed ? `<div class="num-badge" style="color:${day.color}">${i + 1}</div>` : '') +
+          `</div>`,
         iconSize: [28, 28],
         iconAnchor: [14, 28],
         popupAnchor: [0, -26]
@@ -1083,8 +1101,10 @@ function renderSidebar() {
         <span class="stop-num" style="background:${day.color}">${si + 1}</span>
         <div class="stop-body">
           <div class="stop-name-row">
-            <select class="stop-type" title="地點類型">
+            <select class="stop-type" title="地點類型（➕ 可自訂圖標）" aria-label="地點類型">
               ${STOP_TYPES.map(([emoji, label]) => `<option value="${emoji}" ${(stop.type || '📍') === emoji ? 'selected' : ''}>${emoji}</option>`).join('')}
+              ${!STOP_TYPES.some(([e]) => e === (stop.type || '📍')) ? `<option value="${esc(stop.type)}" selected>${esc(stop.type)}</option>` : ''}
+              <option value="__custom__">➕</option>
             </select>
             <input class="stop-name" value="${esc(stop.name)}" title="點擊改名">
           </div>
@@ -1110,7 +1130,15 @@ function renderSidebar() {
         saveState(); renderAll();
         toast(`已把「${stop.name}」移到 ${target.name}`);
       });
-      li.querySelector('.stop-type').addEventListener('change', e => { stop.type = e.target.value; saveState(); renderMap(); });
+      li.querySelector('.stop-type').addEventListener('change', e => {
+        if (e.target.value === '__custom__') {
+          const v = prompt('輸入一個 emoji 或最多 2 個字，當作這個地點的圖標\n（例如 🏔️ 🍦 🎿 🐧 溫泉→♨️）', stop.type !== '📍' ? (stop.type || '') : '');
+          if (v && v.trim()) stop.type = Array.from(v.trim()).slice(0, 2).join('');
+        } else {
+          stop.type = e.target.value;
+        }
+        saveState(); renderAll();  // 重建下拉，讓自訂值出現在選單裡
+      });
       li.querySelector('.stop-name').addEventListener('change', e => { stop.name = e.target.value; saveState(); renderMap(); });
       li.querySelector('.stop-note').addEventListener('change', e => { stop.note = e.target.value; saveState(); });
       li.querySelector('[data-act="focus"]').addEventListener('click', () => {
