@@ -363,7 +363,7 @@
   .day-header.drag-over { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
 
   /* ===== 存檔管理 Modal ===== */
-  #saveModal {
+  #saveModal, #shareModal {
     display: none;
     position: fixed;
     inset: 0;
@@ -374,7 +374,38 @@
     align-items: center;
     justify-content: center;
   }
-  #saveModal.open { display: flex; }
+  #saveModal.open, #shareModal.open { display: flex; }
+  .share-section { padding: 4px 0 14px; }
+  .share-section + .share-section { border-top: 1px solid var(--border); padding-top: 14px; }
+  .share-section h3 { font-size: 14.5px; margin-bottom: 4px; }
+  .share-section .desc { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+  .share-link-box {
+    display: none;
+    margin-top: 10px;
+    padding: 9px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: var(--muted);
+    word-break: break-all;
+    max-height: 72px;
+    overflow-y: auto;
+  }
+  .share-link-box.show { display: block; }
+  .sync-status {
+    display: none;
+    align-items: center; gap: 8px;
+    margin-top: 10px;
+    padding: 9px 12px;
+    background: #ecfdf3;
+    border: 1px solid #b7e4c7;
+    border-radius: var(--radius-sm);
+    font-size: 12.5px;
+  }
+  .sync-status.show { display: flex; }
+  .sync-dot { width: 9px; height: 9px; border-radius: 50%; background: #12b76a; flex-shrink: 0; }
+  .sync-dot.off { background: #f79009; }
   .modal-box {
     background: var(--panel);
     border-radius: 14px;
@@ -569,7 +600,8 @@
       </div>
     </div>
     <div id="sidebarFooter">
-      <button class="btn primary" id="saveManagerBtn">🗂️ 存檔管理</button>
+      <button class="btn primary" id="shareBtn">🔗 分享／共編</button>
+      <button class="btn" id="saveManagerBtn">🗂️ 存檔管理</button>
       <button class="btn" id="copyTextBtn">📋 複製文字行程</button>
       <button class="btn" id="exportKmlBtn">🌍 匯出 KML</button>
       <button class="btn" id="exportBtn">💾 匯出 JSON</button>
@@ -585,6 +617,35 @@
 </div>
 
 <div id="toast" role="status" aria-live="polite"></div>
+
+<div id="shareModal" role="dialog" aria-modal="true" aria-label="分享與共同編輯">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="title">🔗 分享與共同編輯</span>
+      <button class="icon-btn" id="shareModalClose" title="關閉" aria-label="關閉" style="font-size:18px">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="share-section">
+        <h3>📤 分享唯讀副本</h3>
+        <p class="desc">把目前的行程打包成一條連結。朋友打開會載入一份<b>副本</b>，他改他的、你的不會動。行程全部壓縮在連結裡，不會上傳到任何伺服器。</p>
+        <button class="btn primary" id="copyShareLinkBtn">📋 複製分享連結</button>
+        <div class="share-link-box" id="shareLinkBox"></div>
+      </div>
+      <div class="share-section">
+        <h3>👥 共同編輯</h3>
+        <p class="desc" id="syncDesc">和旅伴一起編輯<b>同一份</b>行程：任何人的改動會自動同步給所有人（約 10 秒內）。</p>
+        <div id="syncOffView">
+          <button class="btn primary" id="createSyncBtn">🚀 建立共同編輯連結</button>
+        </div>
+        <div id="syncOnView" style="display:none">
+          <button class="btn" id="copySyncLinkBtn">📋 複製共編連結給旅伴</button>
+          <button class="btn" id="leaveSyncBtn">🚪 結束共同編輯</button>
+          <div class="sync-status show" id="syncStatus"><span class="sync-dot" id="syncDot"></span><span id="syncStatusText">已連線</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div id="welcomeModal" role="dialog" aria-modal="true" aria-label="新手導覽">
   <div class="welcome-box">
@@ -622,6 +683,7 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/lz-string@1.5.0/libs/lz-string.min.js"></script>
 <script>
 'use strict';
 
@@ -648,7 +710,9 @@ const ICONS = {
 /* ============ 公開版設定 ============ */
 const SITE_CONFIG = {
   // GA4 評估 ID（資源「紐西蘭旅遊攻略」→ 串流「行程規劃器 trip-planner」）；留空 = 不載入任何追蹤
-  analyticsId: 'G-7LD9T7TJBX'
+  analyticsId: 'G-7LD9T7TJBX',
+  // 共同編輯後端（REST JSON 儲存，例如 Firebase RTDB 網址）；留空 = 共編功能顯示「開通中」
+  syncDbUrl: ''
 };
 function track(name, params) {
   if (window.gtag) window.gtag('event', name, params || {});
@@ -703,7 +767,10 @@ const overlay = L.layerGroup().addTo(map);
 
 /* ============ 工具函式 ============ */
 function uid() { return Math.random().toString(36).slice(2, 10); }
-function saveState() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {} }
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  if (window.SyncEngine && window.SyncEngine.active) window.SyncEngine.schedulePush();
+}
 function loadState() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
 }
@@ -1406,6 +1473,7 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Escape') {
     closeSaveModal();
+    document.getElementById('shareModal').classList.remove('open');
     document.getElementById('sidebar').classList.remove('open');
     if (document.getElementById('welcomeModal').classList.contains('open')) closeWelcome();
   }
@@ -1538,6 +1606,214 @@ function setToolsCollapsed(collapsed) {
 toolsToggle.addEventListener('click', () => setToolsCollapsed(toolsBody.style.display !== 'none'));
 setToolsCollapsed(localStorage.getItem('trip-map-planner-tools-collapsed') === '1');
 
+/* ============ 分享與共同編輯 ============ */
+const SYNC_KEY = 'trip-map-planner-sync-v1';
+
+function tripEssence() {
+  return JSON.stringify({ days: state.days, startDate: state.startDate || null });
+}
+function buildShareLink() {
+  const payload = { days: state.days, activeDayId: state.activeDayId, view: state.view, startDate: state.startDate || null };
+  return location.origin + location.pathname + '#trip=' + LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+}
+function applySharedTrip(data, label) {
+  pushUndo();
+  state = JSON.parse(JSON.stringify(data));
+  if (!state.days.find(d => d.id === state.activeDayId)) state.activeDayId = state.days[0] ? state.days[0].id : null;
+  Object.keys(routeCache).forEach(k => delete routeCache[k]);
+  document.getElementById('startDate').value = state.startDate || '';
+  saveState(); renderAll();
+  if (state.view) map.setView([state.view.lat, state.view.lng], state.view.zoom);
+  toast(label);
+}
+
+window.SyncEngine = {
+  active: null,
+  clientId: uid() + uid(),
+  lastApplied: 0,
+  lastPushedEssence: '',
+  pushTimer: null,
+  pollTimer: null,
+  enabled() { return !!SITE_CONFIG.syncDbUrl && !!window.LZString; },
+  docUrl(id) { return SITE_CONFIG.syncDbUrl.replace(/\/+$/, '') + '/trips/' + encodeURIComponent(id) + '.json'; },
+  async pushNow(id) {
+    const doc = {
+      updatedAt: Date.now(),
+      by: this.clientId,
+      state: { days: state.days, activeDayId: state.activeDayId, view: state.view, startDate: state.startDate || null }
+    };
+    const r = await fetch(this.docUrl(id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(doc) });
+    if (!r.ok) throw new Error('push ' + r.status);
+    this.lastApplied = doc.updatedAt;
+    this.lastPushedEssence = tripEssence();
+  },
+  schedulePush() {
+    if (!this.active) return;
+    clearTimeout(this.pushTimer);
+    this.pushTimer = setTimeout(async () => {
+      if (!this.active || tripEssence() === this.lastPushedEssence) return;
+      try { await this.pushNow(this.active.id); setSyncStatus(true, '已連線・剛剛同步'); }
+      catch (e) { setSyncStatus(false, '同步失敗，會自動重試'); this.schedulePush(); }
+    }, 2000);
+  },
+  async poll() {
+    if (!this.active || document.hidden) return;
+    try {
+      const r = await fetch(this.docUrl(this.active.id));
+      if (!r.ok) throw new Error(r.status);
+      const doc = await r.json();
+      if (!doc || !doc.state) return;
+      if (doc.updatedAt > this.lastApplied && doc.by !== this.clientId) {
+        this.lastApplied = doc.updatedAt;
+        const remoteEssence = JSON.stringify({ days: doc.state.days, startDate: doc.state.startDate || null });
+        if (remoteEssence !== tripEssence()) {
+          state.days = doc.state.days;
+          state.startDate = doc.state.startDate || null;
+          if (!state.days.find(d => d.id === state.activeDayId)) state.activeDayId = state.days[0] ? state.days[0].id : null;
+          Object.keys(routeCache).forEach(k => delete routeCache[k]);
+          document.getElementById('startDate').value = state.startDate || '';
+          this.lastPushedEssence = tripEssence();  // 剛套用的內容不要再推回去
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+          renderAll();
+          toast('🔄 已同步旅伴的變更');
+        } else {
+          this.lastPushedEssence = remoteEssence;
+        }
+      }
+      setSyncStatus(true, '已連線・自動同步中');
+    } catch (e) { setSyncStatus(false, '連線不穩，重試中…'); }
+  },
+  activate(id) {
+    this.active = { id };
+    try { localStorage.setItem(SYNC_KEY, id); } catch (e) {}
+    clearInterval(this.pollTimer);
+    this.pollTimer = setInterval(() => this.poll(), 8000);
+    updateSyncUI();
+  },
+  leave() {
+    this.active = null;
+    clearInterval(this.pollTimer);
+    clearTimeout(this.pushTimer);
+    try { localStorage.removeItem(SYNC_KEY); } catch (e) {}
+    updateSyncUI();
+  }
+};
+
+function setSyncStatus(ok, text) {
+  const dot = document.getElementById('syncDot');
+  const t = document.getElementById('syncStatusText');
+  if (dot) dot.className = 'sync-dot' + (ok ? '' : ' off');
+  if (t) t.textContent = text;
+}
+function updateSyncUI() {
+  const on = !!window.SyncEngine.active;
+  document.getElementById('syncOnView').style.display = on ? 'block' : 'none';
+  document.getElementById('syncOffView').style.display = on ? 'none' : 'block';
+  if (!window.SyncEngine.enabled()) {
+    document.getElementById('syncDesc').innerHTML = '和旅伴一起編輯<b>同一份</b>行程，改動自動同步。<b>雲端同步服務開通中</b>——目前請先用上面的唯讀分享。';
+  }
+}
+
+document.getElementById('shareBtn').addEventListener('click', () => {
+  updateSyncUI();
+  document.getElementById('shareLinkBox').classList.remove('show');
+  document.getElementById('shareModal').classList.add('open');
+});
+document.getElementById('shareModalClose').addEventListener('click', () => document.getElementById('shareModal').classList.remove('open'));
+document.getElementById('shareModal').addEventListener('click', e => {
+  if (e.target.id === 'shareModal') document.getElementById('shareModal').classList.remove('open');
+});
+document.getElementById('copyShareLinkBtn').addEventListener('click', () => {
+  if (!window.LZString) { toast('壓縮元件載入失敗，請重新整理再試'); return; }
+  if (!state.days.some(d => d.stops.length)) { toast('行程還是空的，先加幾個地點吧'); return; }
+  const link = buildShareLink();
+  const box = document.getElementById('shareLinkBox');
+  box.textContent = link;
+  box.classList.add('show');
+  const done = () => toast(link.length > 8000 ? '已複製！連結較長，用 LINE 傳請直接貼上、不要手動斷行' : '已複製分享連結，貼給朋友吧！');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(done).catch(() => fallbackCopy(link, done));
+  } else fallbackCopy(link, done);
+  track('share_created', { length: link.length });
+});
+document.getElementById('createSyncBtn').addEventListener('click', async () => {
+  if (!window.SyncEngine.enabled()) { toast('共同編輯開通中，先用唯讀分享連結吧！'); return; }
+  if (!state.days.some(d => d.stops.length)) { toast('行程還是空的，先加幾個地點再開共編'); return; }
+  const btn = document.getElementById('createSyncBtn');
+  btn.disabled = true; btn.textContent = '建立中…';
+  try {
+    const id = 't' + uid() + uid();
+    await window.SyncEngine.pushNow(id);
+    window.SyncEngine.activate(id);
+    const link = location.origin + location.pathname + '#sync=' + id;
+    const done = () => toast('共編已開啟！連結已複製，傳給旅伴就能一起編');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(done).catch(() => fallbackCopy(link, done));
+    } else fallbackCopy(link, done);
+    track('sync_created');
+  } catch (e) {
+    toast('建立失敗，請稍後再試');
+  }
+  btn.disabled = false; btn.textContent = '🚀 建立共同編輯連結';
+});
+document.getElementById('copySyncLinkBtn').addEventListener('click', () => {
+  if (!window.SyncEngine.active) return;
+  const link = location.origin + location.pathname + '#sync=' + window.SyncEngine.active.id;
+  const done = () => toast('已複製共編連結');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(done).catch(() => fallbackCopy(link, done));
+  } else fallbackCopy(link, done);
+});
+document.getElementById('leaveSyncBtn').addEventListener('click', () => {
+  if (!confirm('結束共同編輯？行程會留在你這裡，但之後的改動不再同步。')) return;
+  window.SyncEngine.leave();
+  toast('已結束共同編輯');
+});
+
+/* 開站時處理分享/共編連結，回傳是否吃掉了 hash */
+function bootShareSync() {
+  const h = location.hash || '';
+  if (h.startsWith('#trip=') && window.LZString) {
+    try {
+      const data = JSON.parse(LZString.decompressFromEncodedURIComponent(h.slice(6)));
+      if (!data || !Array.isArray(data.days)) throw 0;
+      const hasData = state.days.some(d => d.stops.length);
+      if (!hasData || confirm('要載入朋友分享的行程嗎？目前畫面上的行程會被取代（可 Ctrl+Z 復原）。')) {
+        applySharedTrip(data, '✈️ 已載入分享的行程');
+        track('share_opened');
+      }
+    } catch (e) { toast('分享連結無效或已損壞'); }
+    history.replaceState(null, '', location.pathname + location.search);
+    try { localStorage.setItem(WELCOME_KEY, '1'); } catch (e) {}
+    return true;
+  }
+  if (h.startsWith('#sync=')) {
+    history.replaceState(null, '', location.pathname + location.search);
+    if (!window.SyncEngine.enabled()) { toast('共同編輯服務開通中，暫時無法加入'); return true; }
+    const id = h.slice(6);
+    fetch(window.SyncEngine.docUrl(id)).then(r => r.json()).then(doc => {
+      if (!doc || !doc.state) throw 0;
+      const hasData = state.days.some(d => d.stops.length);
+      if (hasData && !confirm('要加入這份共同編輯的行程嗎？目前畫面上的行程會被取代（可 Ctrl+Z 復原）。')) return;
+      applySharedTrip(doc.state, '👥 已加入共同編輯，改動會自動同步');
+      window.SyncEngine.lastApplied = doc.updatedAt || 0;
+      window.SyncEngine.lastPushedEssence = tripEssence();
+      window.SyncEngine.activate(id);
+      track('sync_joined');
+    }).catch(() => toast('找不到這份共編行程，可能已被結束或刪除'));
+    try { localStorage.setItem(WELCOME_KEY, '1'); } catch (e) {}
+    return true;
+  }
+  // 回訪者：恢復上次的共編
+  const savedSync = (() => { try { return localStorage.getItem(SYNC_KEY); } catch (e) { return null; } })();
+  if (savedSync && window.SyncEngine.enabled()) {
+    window.SyncEngine.lastPushedEssence = tripEssence();
+    window.SyncEngine.activate(savedSync);
+    window.SyncEngine.poll();
+  }
+  return false;
+}
+
 /* ============ 新手導覽與範例行程 ============ */
 const WELCOME_KEY = 'trip-map-planner-welcome-v1';
 const DEMO_TRIP = {
@@ -1591,8 +1867,9 @@ document.getElementById('welcomeDemoBtn').addEventListener('click', () => {
 /* ============ 啟動 ============ */
 if (state.startDate) startDateInput.value = state.startDate;
 renderAll();
-// 第一次來、且還沒排任何行程 → 顯示導覽
-if (!localStorage.getItem(WELCOME_KEY) && !state.days.some(d => d.stops.length)) openWelcome();
+const hashHandled = bootShareSync();
+// 第一次來、且還沒排任何行程、也不是點分享連結進來 → 顯示導覽
+if (!hashHandled && !localStorage.getItem(WELCOME_KEY) && !state.days.some(d => d.stops.length)) openWelcome();
 track('planner_loaded', { days: state.days.length });
 setTimeout(() => { const h = document.getElementById('hint'); if (h) h.style.opacity = '0'; }, 8000);
 </script>
