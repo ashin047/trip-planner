@@ -356,6 +356,45 @@
     font-family: "Noto Sans TC", "Segoe UI", sans-serif;
   }
 
+  /* 空狀態：地圖中央的淡浮水印 */
+  #mapEmptyHint {
+    position: absolute;
+    top: 0; bottom: 0; right: 0; left: 340px;
+    display: none;
+    flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    pointer-events: none;
+    z-index: 850;
+    font-family: var(--serif);
+    font-size: 17px; letter-spacing: 3px;
+    color: #9a917f;
+    text-shadow: 0 1px 0 rgba(255,255,255,.7);
+  }
+  #mapEmptyHint.show { display: flex; }
+  #mapEmptyHint .ico { font-size: 30px; opacity: .55; }
+  @media (max-width: 760px) { #mapEmptyHint { left: 0; } }
+
+  /* Leaflet 彈窗與 tooltip 換成紙感圓角 */
+  .leaflet-popup-content-wrapper {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow-lg);
+  }
+  .leaflet-popup-content { margin: 12px 15px; font-size: 13px; line-height: 1.6; font-family: "Noto Sans TC", "Segoe UI", sans-serif; }
+  .leaflet-popup-content b { font-family: var(--serif); font-size: 13.5px; }
+  .leaflet-popup-content a { color: var(--accent); }
+  .leaflet-popup-tip { background: var(--panel); border: 1px solid var(--border); }
+  .leaflet-popup-close-button { color: var(--muted) !important; font-size: 18px !important; padding: 6px 8px 0 0 !important; }
+  .leaflet-tooltip {
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: var(--shadow);
+    font-family: "Noto Sans TC", "Segoe UI", sans-serif; font-size: 12px;
+    padding: 3px 9px;
+  }
+
   #hint {
     position: absolute;
     bottom: 18px; left: 50%; transform: translateX(-50%);
@@ -555,6 +594,12 @@
   }
   .welcome-step b { font-size: 14px; }
   .welcome-step p { font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.55; }
+  .welcome-step.welcome-note {
+    background: var(--accent-soft);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin: 4px 0 12px;
+  }
   .welcome-actions { display: flex; gap: 10px; padding: 8px 22px 22px; }
   .welcome-actions .btn { flex: 1; min-height: 42px; font-size: 14px; }
 
@@ -596,6 +641,8 @@
     /* iOS：輸入框 <16px 會觸發自動放大 */
     #searchInput, .stop-name, .stop-note, .day-name, #saveNameInput { font-size: 16px; }
     #hint { max-width: 92vw; white-space: normal; text-align: center; }
+    /* CTA 卡副標在窄螢幕縮小避免截斷 */
+    .tl-txt small { font-size: 10px; letter-spacing: -.2px; }
     /* 側欄打開時隱藏浮動按鈕，避免擋住底部功能列 */
     #sidebar.open + #sidebarToggle { display: none; }
   }
@@ -610,7 +657,7 @@
     <div id="searchResults"></div>
   </div>
   <select id="mapType" class="btn" title="底圖" aria-label="選擇地圖底圖">
-    <option value="carto" selected>🕊️ 極簡淺色</option>
+    <option value="carto" selected>🕊️ 極簡淺色（英文地名）</option>
     <option value="m">Google 街道圖</option>
     <option value="s">Google 衛星圖</option>
     <option value="y">Google 混合圖</option>
@@ -639,7 +686,7 @@
   <div id="sidebar">
     <div id="sidebarHeader">
       <span class="title">📅 行程安排</span>
-      <button class="btn" id="undoBtn" title="復原上一步（Ctrl+Z）">↩️</button>
+      <button class="btn" id="undoBtn" title="復原上一步（Ctrl+Z）"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10a6 6 0 0 1 0 12h-3"/><path d="M7 4 3 8l4 4"/></svg></button>
       <button class="btn primary" id="addDayBtn">＋ 新增一天</button>
     </div>
     <div id="dateRow">
@@ -686,6 +733,7 @@
   <div id="sidebarBackdrop" aria-hidden="true"></div>
   <div id="map"></div>
   <div id="hint">點一下地圖，就會把地點加進目前選中的那一天</div>
+  <div id="mapEmptyHint" aria-hidden="true"><span class="ico">🧭</span>搜尋地點，或點地圖任一處開始</div>
 </div>
 
 <div id="toast" role="status" aria-live="polite"></div>
@@ -729,7 +777,7 @@
       <div class="welcome-step"><span class="n">1</span><div><b>加地點</b><p>上方搜尋地名，或直接點地圖上任何位置</p></div></div>
       <div class="welcome-step"><span class="n">2</span><div><b>分天規劃</b><p>「＋新增一天」建立 Day 2、Day 3⋯每天一種顏色。地點可以拖曳排序，也能用 📆 搬到別天</p></div></div>
       <div class="welcome-step"><span class="n">3</span><div><b>看路線、帶著走</b><p>自動算出每段開車距離與時間，一鍵丟回 Google Maps 導航，或複製文字版行程貼給旅伴</p></div></div>
-      <div class="welcome-step"><span class="n">💾</span><div><b>不用怕不見</b><p>所有變動即時自動儲存；誤刪按 Ctrl+Z 或 ↩️ 就能復原</p></div></div>
+      <div class="welcome-step welcome-note"><span class="n">💾</span><div><b>不用怕不見</b><p>所有變動即時自動儲存；誤刪按 Ctrl+Z 或復原鍵就能救回</p></div></div>
     </div>
     <div class="welcome-actions">
       <button class="btn" id="welcomeDemoBtn">🎬 載入範例行程</button>
@@ -930,7 +978,7 @@ window.__stopAction = function (act, dayId, stopId) {
       delete routeCache[day.id];
       map.closePopup();
       saveState(); renderAll();
-      toast('已移除，按 ↩️ 可復原');
+      toast('已移除，可按復原鍵救回');
     }
   }
   return false;
@@ -1023,7 +1071,7 @@ function drawRoute(day) {
   const straight = day.stops.map(s => [s.lat, s.lng]);
 
   if (mode === 'straight') {
-    L.polyline(straight, { color: day.color, weight: 4, opacity: .85 }).addTo(overlay);
+    L.polyline(straight, { color: day.color, weight: 4, opacity: .85 }).bindTooltip(day.name, { sticky: true }).addTo(overlay);
     let dist = 0;
     for (let i = 1; i < day.stops.length; i++) dist += haversine(day.stops[i-1], day.stops[i]);
     day._info = `直線距離約 ${fmtKm(dist)}`;
@@ -1039,7 +1087,7 @@ function drawRoute(day) {
     L.polyline(
       [[day.stops[p.a].lat, day.stops[p.a].lng], [day.stops[p.b].lat, day.stops[p.b].lng]],
       { color: day.color, weight: 3, opacity: .65, dashArray: '2 10' }
-    ).addTo(overlay);
+    ).bindTooltip(day.name + '（飛行段）', { sticky: true }).addTo(overlay);
   });
 
   if (!driveParts.length) {
@@ -1054,12 +1102,12 @@ function drawRoute(day) {
     let dist = 0, dur = 0, failed = 0;
     cached.parts.forEach((seg, pi) => {
       if (seg) {
-        L.polyline(seg.latlngs, { color: day.color, weight: 4, opacity: .85 }).addTo(overlay);
+        L.polyline(seg.latlngs, { color: day.color, weight: 4, opacity: .85 }).bindTooltip(day.name, { sticky: true }).addTo(overlay);
         dist += seg.distance; dur += seg.duration;
       } else {
         // 該段查詢失敗，退回直線虛線
         L.polyline(driveParts[pi].idxs.map(ix => [day.stops[ix].lat, day.stops[ix].lng]),
-          { color: day.color, weight: 3, opacity: .5, dashArray: '6 8' }).addTo(overlay);
+          { color: day.color, weight: 3, opacity: .5, dashArray: '6 8' }).bindTooltip(day.name, { sticky: true }).addTo(overlay);
         failed++;
       }
     });
@@ -1075,7 +1123,7 @@ function drawRoute(day) {
   // 先畫虛線佔位，並對每個開車段發出請求
   driveParts.forEach(p => {
     L.polyline(p.idxs.map(ix => [day.stops[ix].lat, day.stops[ix].lng]),
-      { color: day.color, weight: 3, opacity: .5, dashArray: '6 8' }).addTo(overlay);
+      { color: day.color, weight: 3, opacity: .5, dashArray: '6 8' }).bindTooltip(day.name, { sticky: true }).addTo(overlay);
   });
   day._info = '計算開車路線中…';
   updateDayInfo(day);
@@ -1349,6 +1397,10 @@ function renderSidebar() {
   });
   state.days.forEach(d => refreshLegs(d));
   refreshDateHint();
+  // 空狀態浮水印：完全沒有地點時才顯示
+  const totalStops = state.days.reduce((n, d) => n + d.stops.length, 0);
+  const meh = document.getElementById('mapEmptyHint');
+  if (meh) meh.classList.toggle('show', totalStops === 0);
 }
 
 function renderAll() { renderSidebar(); renderMap(); }
@@ -1379,7 +1431,12 @@ function addStop(lat, lng, name) {
   track('add_stop');
 }
 
+// 點地圖「關彈窗」的那一下不算加點（否則每次關彈窗都會生出幽靈地點）
+let popupJustClosedAt = 0;
+map.on('popupclose', () => { popupJustClosedAt = Date.now(); });
+
 map.on('click', e => {
+  if (Date.now() - popupJustClosedAt < 400) return; // 這一下只是關彈窗
   // 反查地名（失敗就用座標當名字）
   const { lat, lng } = e.latlng;
   fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=17&accept-language=zh-TW`)
