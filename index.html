@@ -282,14 +282,40 @@
   .day-footer .mini-btn:hover { border-color: var(--accent); color: var(--accent); }
 
   #sidebarFooter {
-    padding: 10px 12px;
+    padding: 12px;
     border-top: 1px solid var(--border);
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 8px;
-    flex-wrap: wrap;
+    background: var(--panel);
   }
-  #moreTools { display: none; gap: 8px; flex-wrap: wrap; width: 100%; padding-top: 2px; }
-  #moreTools.open { display: flex; }
+  #sidebarFooter .btn {
+    width: 100%;
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 13.5px;
+  }
+  #shareBtn { grid-column: 1 / -1; min-height: 46px; font-size: 14.5px; letter-spacing: .5px; }
+  #moreToolsBtn {
+    grid-column: 1 / -1;
+    min-height: 36px;
+    background: transparent;
+    border-style: dashed;
+    color: var(--muted);
+  }
+  #moreToolsBtn:hover { color: var(--accent); border-color: var(--accent); background: transparent; }
+  #moreTools {
+    grid-column: 1 / -1;
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  #moreTools.open { display: grid; }
+  #clearBtn { color: var(--danger); }
+  #clearBtn:hover { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
   .popup-actions a { text-decoration: none; font-size: 12.5px; }
   .help-q {
     display: inline-flex; width: 18px; height: 18px; border-radius: 50%;
