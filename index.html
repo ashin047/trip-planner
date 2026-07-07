@@ -11,24 +11,27 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700;900&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   :root {
-    --bg: #f4f6f9;
-    --panel: #ffffff;
-    --border: #e4e8ee;
-    --text: #1b2130;
-    --muted: #667085;          /* 對比 ≥ 4.5:1 */
-    --accent: #1a6ee8;
-    --accent-strong: #1557c2;
-    --accent-soft: #eaf1fe;
-    --danger: #d93025;
-    --danger-soft: #fce8e6;
+    /* 文青紙感色系：奶油紙、墨綠、陶土 */
+    --bg: #f5f1e8;
+    --panel: #fffdf7;
+    --border: #e6dfd0;
+    --text: #33302a;
+    --muted: #7b7466;          /* 對比 ≥ 4.5:1 */
+    --accent: #47695c;         /* 墨綠 */
+    --accent-strong: #38564b;
+    --accent-soft: #e9efe8;
+    --accent2: #bd7048;        /* 陶土 */
+    --danger: #b8483d;
+    --danger-soft: #f7e8e4;
     --radius: 12px;
     --radius-sm: 9px;
-    --shadow: 0 1px 2px rgba(16,24,40,.05), 0 3px 10px rgba(16,24,40,.06);
-    --shadow-lg: 0 12px 36px rgba(16,24,40,.2);
+    --shadow: 0 1px 2px rgba(72,62,48,.06), 0 3px 10px rgba(72,62,48,.07);
+    --shadow-lg: 0 12px 36px rgba(60,50,38,.22);
+    --serif: "Noto Serif TC", "Georgia", serif;
     --dur: 180ms;
     --ease: cubic-bezier(.2,.7,.3,1);
   }
@@ -75,14 +78,15 @@
   #topbar { box-shadow: 0 2px 10px rgba(16,24,40,.05); }
   #topbar h1 {
     display: flex; align-items: center; gap: 9px;
-    font-size: 16.5px; font-weight: 900; letter-spacing: .4px;
+    font-family: var(--serif);
+    font-size: 17px; font-weight: 900; letter-spacing: 1px;
     margin-right: 6px; white-space: nowrap;
   }
   #topbar h1 .logo {
     width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
-    background: linear-gradient(135deg, #1a6ee8 0%, #00a99b 100%);
+    background: linear-gradient(135deg, #47695c 0%, #bd7048 100%);
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 2px 6px rgba(26,110,232,.35);
+    box-shadow: 0 2px 6px rgba(71,105,92,.35);
   }
   #topbar h1 .logo svg { width: 18px; height: 18px; stroke: #fff; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
   #searchWrap { position: relative; flex: 1; min-width: 220px; max-width: 420px; }
@@ -126,9 +130,9 @@
   .btn:hover { background: var(--accent-soft); border-color: var(--accent); }
   .btn:active { transform: scale(.97); }
   .btn.primary {
-    background: linear-gradient(180deg, #2b7ff0, var(--accent));
+    background: linear-gradient(180deg, #54796b, var(--accent));
     color: #fff; border-color: var(--accent);
-    box-shadow: 0 1px 3px rgba(21,87,194,.35);
+    box-shadow: 0 1px 3px rgba(56,86,75,.35);
     font-weight: 500;
   }
   .btn.primary:hover { background: var(--accent-strong); }
@@ -165,7 +169,7 @@
     overflow: hidden;
     transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
   }
-  .day-card.active { border-color: var(--accent); border-left-color: var(--accent); box-shadow: 0 2px 10px rgba(26,115,232,.15); }
+  .day-card.active { border-color: var(--accent); border-left-color: var(--accent); box-shadow: 0 2px 10px rgba(71,105,92,.18); }
   .day-header {
     display: flex;
     align-items: center;
@@ -174,10 +178,13 @@
     cursor: pointer;
     user-select: none;
     transition: background var(--dur) var(--ease);
+    flex-wrap: wrap;   /* 名稱佔第一行，日期站數換到第二行 */
   }
-  .day-header:hover { background: #f4f7fd; }
+  .day-header .day-meta { flex-basis: 100%; order: 10; padding-left: 22px; font-size: 11.5px; margin-top: 1px; }
+  .day-header .day-name { min-width: 90px; }
+  .day-header:hover { background: #f1ede2; }
   .day-color-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.2); }
-  .day-name { flex: 1; font-size: 14px; font-weight: 600; border: none; background: transparent; outline: none; min-width: 0; font-family: inherit; color: var(--text); }
+  .day-name { flex: 1; font-size: 14.5px; font-weight: 700; border: none; background: transparent; outline: none; min-width: 0; font-family: var(--serif); color: var(--text); }
   .day-name:focus { border-bottom: 1px dashed var(--accent); }
   .day-meta { font-size: 11px; color: var(--muted); white-space: nowrap; }
   .icon-btn {
@@ -209,7 +216,7 @@
     background: #fff;
     transition: background var(--dur) var(--ease);
   }
-  .stop-item:hover { background: #fafbfd; }
+  .stop-item:hover { background: #faf7ef; }
   .stop-item.dragging { opacity: .4; }
   .stop-item.drag-over { border-top: 2px solid var(--accent); }
   .stop-num {
@@ -237,7 +244,7 @@
     padding: 3px 10px 3px 44px;
     font-size: 12px;
     color: var(--muted);
-    background: #fafbfc;
+    background: #f6f2e9;
     border-top: 1px dashed var(--border);
     list-style: none;
     font-variant-numeric: tabular-nums;   /* 數字等寬，路線更新時不跳動 */
@@ -248,7 +255,7 @@
     border-bottom: 1px solid var(--border);
     font-size: 12.5px;
     color: var(--muted);
-    background: #fafbfc;
+    background: #f6f2e9;
   }
   #dateRow input[type="date"] {
     border: 1px solid var(--border);
@@ -264,7 +271,7 @@
     display: flex; align-items: center; gap: 6px;
     padding: 7px 10px;
     border-top: 1px solid var(--border);
-    background: #fafbfc;
+    background: #f6f2e9;
   }
   .day-footer .route-info { flex: 1; font-size: 11px; color: var(--muted); }
   .day-footer .mini-btn {
@@ -298,27 +305,28 @@
 
   /* ===== Map ===== */
   #map { flex: 1; min-width: 0; z-index: 1; }
-  .marker-wrap { position: relative; width: 28px; height: 28px; }
+  /* 文青風標記：奶油底圓徽章＋色圈 */
+  .marker-wrap { position: relative; width: 27px; height: 27px; }
   .num-marker {
-    width: 28px; height: 28px; border-radius: 50% 50% 50% 0;
-    transform: rotate(-45deg);
-    border: 2px solid #fff;
-    box-shadow: 0 2px 5px rgba(0,0,0,.35);
+    width: 27px; height: 27px; border-radius: 50%;
+    background: #fffdf7;
+    border: 2.5px solid;   /* 邊框色由 inline style 帶入當日顏色 */
+    box-shadow: 0 2px 6px rgba(60,50,38,.3);
     display: flex; align-items: center; justify-content: center;
   }
   .num-marker span {
-    transform: rotate(45deg);
-    color: #fff; font-size: 12px; font-weight: 700;
-    font-family: "Noto Sans TC", "Segoe UI", sans-serif;
+    font-size: 12px; font-weight: 700;
+    font-family: var(--serif);
   }
   .num-marker span.emoji { font-size: 13px; line-height: 1; }
   .num-badge {
-    position: absolute; top: -7px; right: -9px;
+    position: absolute; bottom: -5px; right: -7px;
     min-width: 15px; height: 15px; padding: 0 3px;
-    border-radius: 8px; background: #fff;
-    font-size: 10px; font-weight: 700;
+    border-radius: 8px;
+    color: #fffdf7; font-size: 9.5px; font-weight: 700;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,.35);
+    border: 1.5px solid #fffdf7;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25);
     font-family: "Noto Sans TC", "Segoe UI", sans-serif;
   }
 
@@ -339,7 +347,7 @@
   #toast {
     position: fixed;
     top: 60px; left: 50%; transform: translateX(-50%);
-    background: #323639; color: #fff;
+    background: #2f2b26; color: #fff;
     padding: 9px 18px; border-radius: 8px;
     font-size: 13px; z-index: 2000;
     opacity: 0; pointer-events: none;
@@ -356,7 +364,7 @@
   }
 
   /* ===== 旅遊工具箱（聯盟推薦） ===== */
-  #toolsPanel { border-top: 1px solid var(--border); background: #fafbfc; flex-shrink: 0; }
+  #toolsPanel { border-top: 1px solid var(--border); background: #f6f2e9; flex-shrink: 0; }
   .tools-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 9px 12px; cursor: pointer; user-select: none;
@@ -446,7 +454,7 @@
     padding: 14px 18px;
     border-bottom: 1px solid var(--border);
   }
-  .modal-header .title { font-size: 15px; font-weight: 700; }
+  .modal-header .title { font-size: 15.5px; font-weight: 700; font-family: var(--serif); letter-spacing: .5px; }
   .modal-body { padding: 14px 18px; overflow-y: auto; flex: 1; }
   .save-new-row { display: flex; gap: 8px; margin-bottom: 14px; }
   .save-new-row input {
@@ -493,11 +501,11 @@
     width: min(460px, 94vw); max-height: 88vh; overflow-y: auto;
   }
   .welcome-hero {
-    background: linear-gradient(135deg, #1a6ee8 0%, #00a99b 100%);
+    background: linear-gradient(135deg, #47695c 0%, #8fa377 100%);
     padding: 26px 24px 20px; color: #fff;
     border-radius: 18px 18px 0 0;
   }
-  .welcome-hero h2 { font-size: 20px; font-weight: 900; letter-spacing: .5px; }
+  .welcome-hero h2 { font-size: 20px; font-weight: 900; letter-spacing: 1.5px; font-family: var(--serif); }
   .welcome-hero p { font-size: 13px; opacity: .92; margin-top: 5px; }
   .welcome-steps { padding: 20px 22px 6px; }
   .welcome-step { display: flex; gap: 12px; margin-bottom: 15px; align-items: flex-start; }
@@ -550,10 +558,6 @@
     /* iOS：輸入框 <16px 會觸發自動放大 */
     #searchInput, .stop-name, .stop-note, .day-name, #saveNameInput { font-size: 16px; }
     #hint { max-width: 92vw; white-space: normal; text-align: center; }
-    /* 天標題兩行排：第一行=色點+名稱+按鈕，第二行=日期站數，名稱不再被擠掉 */
-    .day-header { flex-wrap: wrap; }
-    .day-name { min-width: 90px; }
-    .day-meta { flex-basis: 100%; order: 10; padding-left: 22px; font-size: 11.5px; margin-top: 1px; }
     /* 側欄打開時隱藏浮動按鈕，避免擋住底部功能列 */
     #sidebar.open + #sidebarToggle { display: none; }
   }
@@ -568,6 +572,7 @@
     <div id="searchResults"></div>
   </div>
   <select id="mapType" class="btn" title="底圖" aria-label="選擇地圖底圖">
+    <option value="carto" selected>🕊️ 極簡淺色</option>
     <option value="m">Google 街道圖</option>
     <option value="s">Google 衛星圖</option>
     <option value="y">Google 混合圖</option>
@@ -718,7 +723,18 @@
 
 /* ============ 常數 ============ */
 const STORAGE_KEY = 'trip-map-planner-v1';
-const DAY_COLORS = ['#e6194b','#3cb44b','#4363d8','#f58231','#911eb4','#42d4f4','#f032e6','#bfef45','#fabed4','#469990','#dcbeff','#9a6324','#800000','#aaffc3','#808000','#000075'];
+/* 文青啞色調色盤（磚紅、苔綠、霧藍、赭黃、藕紫、青瓷…） */
+const DAY_COLORS = ['#b85c4e','#69885f','#5b7da3','#c08b4a','#8d7aa5','#4f8f8b','#b06d84','#7c8450','#a3765a','#5f7d99','#96844f','#6e7a86','#8c5f66','#5e8672','#9b8a72','#4e6e81'];
+/* 舊版鮮豔色 → 新版啞色（載入舊資料/舊分享連結時自動轉換） */
+const LEGACY_COLOR_MAP = {
+  '#e6194b':'#b85c4e','#3cb44b':'#69885f','#4363d8':'#5b7da3','#f58231':'#c08b4a',
+  '#911eb4':'#8d7aa5','#42d4f4':'#4f8f8b','#f032e6':'#b06d84','#bfef45':'#7c8450',
+  '#fabed4':'#a3765a','#469990':'#5f7d99','#dcbeff':'#96844f','#9a6324':'#6e7a86',
+  '#800000':'#8c5f66','#aaffc3':'#5e8672','#808000':'#9b8a72','#000075':'#4e6e81'
+};
+function migrateColors(days) {
+  (days || []).forEach(d => { if (LEGACY_COLOR_MAP[d.color]) d.color = LEGACY_COLOR_MAP[d.color]; });
+}
 const STOP_TYPES = [
   ['📍','景點'], ['🍽️','美食'], ['☕','咖啡'], ['🛏️','住宿'],
   ['🚗','交通'], ['🛒','購物'], ['🎯','活動'], ['⛽','補給'],
@@ -772,21 +788,30 @@ let state = loadState() || {
 if (!state.activeDayId || !state.days.find(d => d.id === state.activeDayId)) {
   state.activeDayId = state.days[0] ? state.days[0].id : null;
 }
+migrateColors(state.days);
 
 const routeCache = {};   // dayId -> { key, latlngs, distance, duration }
 
 /* ============ 地圖初始化 ============ */
 const map = L.map('map', { zoomControl: true }).setView([state.view.lat, state.view.lng], state.view.zoom);
 let tileLayer = null;
-function setBaseLayer(lyrs) {
+function setBaseLayer(v) {
   if (tileLayer) map.removeLayer(tileLayer);
-  tileLayer = L.tileLayer(`https://{s}.google.com/vt/lyrs=${lyrs}&x={x}&y={y}&z={z}`, {
-    maxZoom: 20,
-    subdomains: ['mt0','mt1','mt2','mt3'],
-    attribution: '&copy; Google Maps'
-  }).addTo(map);
+  if (v === 'carto') {
+    tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 20,
+      subdomains: 'abcd',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+    }).addTo(map);
+  } else {
+    tileLayer = L.tileLayer(`https://{s}.google.com/vt/lyrs=${v}&x={x}&y={y}&z={z}`, {
+      maxZoom: 20,
+      subdomains: ['mt0','mt1','mt2','mt3'],
+      attribution: '&copy; Google Maps'
+    }).addTo(map);
+  }
 }
-setBaseLayer('m');
+setBaseLayer('carto');
 map.on('moveend', () => {
   const c = map.getCenter();
   state.view = { lat: c.lat, lng: c.lng, zoom: map.getZoom() };
@@ -888,14 +913,14 @@ function renderMap() {
       const icon = L.divIcon({
         className: '',
         html: `<div class="marker-wrap">` +
-          `<div class="num-marker" style="background:${day.color}">` +
+          `<div class="num-marker" style="border-color:${day.color};color:${day.color}">` +
           (typed ? `<span class="emoji">${esc(t)}</span>` : `<span>${i + 1}</span>`) +
           `</div>` +
-          (typed ? `<div class="num-badge" style="color:${day.color}">${i + 1}</div>` : '') +
+          (typed ? `<div class="num-badge" style="background:${day.color}">${i + 1}</div>` : '') +
           `</div>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 28],
-        popupAnchor: [0, -26]
+        iconSize: [27, 27],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -15]
       });
       const mk = L.marker([stop.lat, stop.lng], { icon, draggable: true }).addTo(overlay);
       const affLink = stop.type === '🛏️'
@@ -1435,6 +1460,7 @@ document.getElementById('importFile').addEventListener('change', e => {
       if (!Array.isArray(data.days)) throw new Error('bad format');
       pushUndo();
       state = data;
+      migrateColors(state.days);
       if (!state.days.find(d => d.id === state.activeDayId)) state.activeDayId = state.days[0] ? state.days[0].id : null;
       Object.keys(routeCache).forEach(k => delete routeCache[k]);
       document.getElementById('startDate').value = state.startDate || '';
@@ -1531,6 +1557,7 @@ function renderSaveList() {
       if (!confirm(`讀取「${sv.name}」？目前畫面上的行程會被取代（未存檔的變更會不見）。`)) return;
       pushUndo();
       state = JSON.parse(JSON.stringify(sv.data));
+      migrateColors(state.days);
       if (!state.days.find(d => d.id === state.activeDayId)) state.activeDayId = state.days[0] ? state.days[0].id : null;
       Object.keys(routeCache).forEach(k => delete routeCache[k]);
       document.getElementById('startDate').value = state.startDate || '';
@@ -1747,6 +1774,7 @@ function buildShareLink() {
 function applySharedTrip(data, label) {
   pushUndo();
   state = JSON.parse(JSON.stringify(data));
+  migrateColors(state.days);
   if (!state.days.find(d => d.id === state.activeDayId)) state.activeDayId = state.days[0] ? state.days[0].id : null;
   Object.keys(routeCache).forEach(k => delete routeCache[k]);
   document.getElementById('startDate').value = state.startDate || '';
@@ -1796,6 +1824,7 @@ window.SyncEngine = {
         const remoteEssence = JSON.stringify({ days: doc.state.days, startDate: doc.state.startDate || null });
         if (remoteEssence !== tripEssence()) {
           state.days = doc.state.days;
+          migrateColors(state.days);
           state.startDate = doc.state.startDate || null;
           if (!state.days.find(d => d.id === state.activeDayId)) state.activeDayId = state.days[0] ? state.days[0].id : null;
           Object.keys(routeCache).forEach(k => delete routeCache[k]);
@@ -1955,19 +1984,19 @@ const DEMO_TRIP = {
   activeDayId: 'demo-d1',
   view: { lat: -44.98, lng: 168.72, zoom: 10 },
   days: [
-    { id: 'demo-d1', name: 'Day 1 皇后鎮市區', color: '#e6194b', visible: true, stops: [
+    { id: 'demo-d1', name: 'Day 1 皇后鎮市區', color: '#b85c4e', visible: true, stops: [
       { id: 'demo-s11', name: '天空纜車 Skyline', lat: -45.0242, lng: 168.6535, type: '🎯', note: '上山看湖景、玩滑板車 Luge' },
       { id: 'demo-s12', name: 'Fergburger', lat: -45.0312, lng: 168.6605, type: '🍽️', note: '排隊漢堡名店，建議避開正午' },
       { id: 'demo-s13', name: '皇后鎮花園', lat: -45.0378, lng: 168.6644, type: '📍', note: '湖畔半島散步約 1 小時' },
       { id: 'demo-s14', name: 'Steamer Wharf 湖畔碼頭', lat: -45.033, lng: 168.6577, type: '☕', note: '傍晚湖邊喝一杯看夕陽' }
     ]},
-    { id: 'demo-d2', name: 'Day 2 箭鎮與酒莊', color: '#3cb44b', visible: true, stops: [
+    { id: 'demo-d2', name: 'Day 2 箭鎮與酒莊', color: '#69885f', visible: true, stops: [
       { id: 'demo-s21', name: '箭鎮 Arrowtown', lat: -44.9387, lng: 168.8348, type: '📍', note: '淘金老街，秋天楓葉最有名' },
       { id: 'demo-s22', name: 'Kawarau 高空彈跳橋', lat: -45.0091, lng: 168.8555, type: '🎯', note: '世界第一個商業彈跳點，不跳用看的也過癮' },
       { id: 'demo-s23', name: 'Gibbston Valley 酒莊', lat: -45.0117, lng: 168.9126, type: '🍽️', note: '午餐＋品酒' },
       { id: 'demo-s24', name: '海斯湖 Lake Hayes', lat: -44.9917, lng: 168.809, type: '📍', note: '環湖步道來回約 2 小時' }
     ]},
-    { id: 'demo-d3', name: 'Day 3 格萊諾基', color: '#4363d8', visible: true, stops: [
+    { id: 'demo-d3', name: 'Day 3 格萊諾基', color: '#5b7da3', visible: true, stops: [
       { id: 'demo-s31', name: 'Bennetts Bluff 觀景點', lat: -45.0288, lng: 168.4386, type: '📍', note: '皇后鎮往格萊諾基沿湖公路最美一站' },
       { id: 'demo-s32', name: '格萊諾基碼頭', lat: -44.8494, lng: 168.3832, type: '📍', note: '魔戒取景地、紅色小屋' },
       { id: 'demo-s33', name: "Mrs Woolly's General Store", lat: -44.848, lng: 168.385, type: '🛒', note: '小鎮伴手好店' }
