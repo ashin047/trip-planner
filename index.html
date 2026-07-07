@@ -9,23 +9,26 @@
 <meta property="og:description" content="點地圖加景點、按天分色、自動算開車路線與車程，一鍵丟回 Google Maps 導航。">
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   :root {
-    --bg: #f7f8fa;
+    --bg: #f4f6f9;
     --panel: #ffffff;
-    --border: #e3e6ea;
-    --text: #1f2430;
-    --muted: #6b7284;          /* 對比 ≥ 4.5:1 */
-    --accent: #1a73e8;
-    --accent-strong: #1765cc;
-    --accent-soft: #e8f0fe;
+    --border: #e4e8ee;
+    --text: #1b2130;
+    --muted: #667085;          /* 對比 ≥ 4.5:1 */
+    --accent: #1a6ee8;
+    --accent-strong: #1557c2;
+    --accent-soft: #eaf1fe;
     --danger: #d93025;
     --danger-soft: #fce8e6;
-    --radius: 10px;
-    --radius-sm: 8px;
-    --shadow: 0 1px 4px rgba(0,0,0,.08);
-    --shadow-lg: 0 8px 28px rgba(0,0,0,.18);
+    --radius: 12px;
+    --radius-sm: 9px;
+    --shadow: 0 1px 2px rgba(16,24,40,.05), 0 3px 10px rgba(16,24,40,.06);
+    --shadow-lg: 0 12px 36px rgba(16,24,40,.2);
     --dur: 180ms;
     --ease: cubic-bezier(.2,.7,.3,1);
   }
@@ -33,7 +36,7 @@
   html, body { height: 100%; }
   @supports (height: 100dvh) { html, body { height: 100dvh; } }
   body {
-    font-family: "Segoe UI", "Microsoft JhengHei", system-ui, sans-serif;
+    font-family: "Noto Sans TC", "Segoe UI", "Microsoft JhengHei", system-ui, sans-serif;
     color: var(--text);
     background: var(--bg);
     display: flex;
@@ -69,7 +72,19 @@
     flex-wrap: wrap;
     z-index: 1100;
   }
-  #topbar h1 { font-size: 16px; font-weight: 700; margin-right: 6px; white-space: nowrap; }
+  #topbar { box-shadow: 0 2px 10px rgba(16,24,40,.05); }
+  #topbar h1 {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 16.5px; font-weight: 900; letter-spacing: .4px;
+    margin-right: 6px; white-space: nowrap;
+  }
+  #topbar h1 .logo {
+    width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+    background: linear-gradient(135deg, #1a6ee8 0%, #00a99b 100%);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(26,110,232,.35);
+  }
+  #topbar h1 .logo svg { width: 18px; height: 18px; stroke: #fff; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
   #searchWrap { position: relative; flex: 1; min-width: 220px; max-width: 420px; }
   #searchInput {
     width: 100%;
@@ -110,7 +125,12 @@
   }
   .btn:hover { background: var(--accent-soft); border-color: var(--accent); }
   .btn:active { transform: scale(.97); }
-  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.primary {
+    background: linear-gradient(180deg, #2b7ff0, var(--accent));
+    color: #fff; border-color: var(--accent);
+    box-shadow: 0 1px 3px rgba(21,87,194,.35);
+    font-weight: 500;
+  }
   .btn.primary:hover { background: var(--accent-strong); }
   select.btn { padding: 7px 8px; }
 
@@ -347,7 +367,9 @@
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(31,36,48,.45);
+    background: rgba(23,28,40,.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     z-index: 3000;
     align-items: center;
     justify-content: center;
@@ -401,6 +423,39 @@
   .save-item .mini-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
   .save-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 0; }
 
+  /* ===== 新手導覽 ===== */
+  #welcomeModal {
+    display: none; position: fixed; inset: 0;
+    background: rgba(23,28,40,.55);
+    backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+    z-index: 3500; align-items: center; justify-content: center; padding: 16px;
+  }
+  #welcomeModal.open { display: flex; }
+  .welcome-box {
+    background: var(--panel); border-radius: 18px;
+    box-shadow: var(--shadow-lg);
+    width: min(460px, 94vw); max-height: 88vh; overflow-y: auto;
+  }
+  .welcome-hero {
+    background: linear-gradient(135deg, #1a6ee8 0%, #00a99b 100%);
+    padding: 26px 24px 20px; color: #fff;
+    border-radius: 18px 18px 0 0;
+  }
+  .welcome-hero h2 { font-size: 20px; font-weight: 900; letter-spacing: .5px; }
+  .welcome-hero p { font-size: 13px; opacity: .92; margin-top: 5px; }
+  .welcome-steps { padding: 20px 22px 6px; }
+  .welcome-step { display: flex; gap: 12px; margin-bottom: 15px; align-items: flex-start; }
+  .welcome-step .n {
+    width: 27px; height: 27px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    font-weight: 700; font-size: 13px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .welcome-step b { font-size: 14px; }
+  .welcome-step p { font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.55; }
+  .welcome-actions { display: flex; gap: 10px; padding: 8px 22px 22px; }
+  .welcome-actions .btn { flex: 1; min-height: 42px; font-size: 14px; }
+
   /* 手機側欄背景遮罩 */
   #sidebarBackdrop {
     display: none;
@@ -451,7 +506,7 @@
 <body>
 
 <div id="topbar">
-  <h1>🗺️ 行程路線規劃器</h1>
+  <h1><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>行程路線規劃器</h1>
   <div id="searchWrap">
     <input id="searchInput" type="text" placeholder="搜尋地點（例如：皇后鎮天空纜車）" aria-label="搜尋地點" autocomplete="off">
     <div id="searchResults"></div>
@@ -477,6 +532,7 @@
     <option value="-45.03,168.66,10">皇后鎮</option>
     <option value="-45.87,170.5,11">但尼丁</option>
   </select>
+  <button class="btn" id="helpBtn" title="使用說明" aria-label="使用說明">❓</button>
 </div>
 
 <div id="main">
@@ -529,6 +585,25 @@
 </div>
 
 <div id="toast" role="status" aria-live="polite"></div>
+
+<div id="welcomeModal" role="dialog" aria-modal="true" aria-label="新手導覽">
+  <div class="welcome-box">
+    <div class="welcome-hero">
+      <h2>🗺️ 三步驟，排好你的旅行</h2>
+      <p>免費、免註冊，排好的行程會自動存在你的瀏覽器裡</p>
+    </div>
+    <div class="welcome-steps">
+      <div class="welcome-step"><span class="n">1</span><div><b>加地點</b><p>上方搜尋地名，或直接點地圖上任何位置</p></div></div>
+      <div class="welcome-step"><span class="n">2</span><div><b>分天規劃</b><p>「＋新增一天」建立 Day 2、Day 3⋯每天一種顏色。地點可以拖曳排序，也能用 📆 搬到別天</p></div></div>
+      <div class="welcome-step"><span class="n">3</span><div><b>看路線、帶著走</b><p>自動算出每段開車距離與時間，一鍵丟回 Google Maps 導航，或複製文字版行程貼給旅伴</p></div></div>
+      <div class="welcome-step"><span class="n">💾</span><div><b>不用怕不見</b><p>所有變動即時自動儲存；誤刪按 Ctrl+Z 或 ↩️ 就能復原</p></div></div>
+    </div>
+    <div class="welcome-actions">
+      <button class="btn" id="welcomeDemoBtn">🎬 載入範例行程</button>
+      <button class="btn primary" id="welcomeStartBtn">開始規劃 →</button>
+    </div>
+  </div>
+</div>
 
 <div id="saveModal">
   <div class="modal-box">
@@ -1332,6 +1407,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeSaveModal();
     document.getElementById('sidebar').classList.remove('open');
+    if (document.getElementById('welcomeModal').classList.contains('open')) closeWelcome();
   }
 });
 document.getElementById('undoBtn').addEventListener('click', undo);
@@ -1462,9 +1538,61 @@ function setToolsCollapsed(collapsed) {
 toolsToggle.addEventListener('click', () => setToolsCollapsed(toolsBody.style.display !== 'none'));
 setToolsCollapsed(localStorage.getItem('trip-map-planner-tools-collapsed') === '1');
 
+/* ============ 新手導覽與範例行程 ============ */
+const WELCOME_KEY = 'trip-map-planner-welcome-v1';
+const DEMO_TRIP = {
+  startDate: null,
+  activeDayId: 'demo-d1',
+  view: { lat: -44.98, lng: 168.72, zoom: 10 },
+  days: [
+    { id: 'demo-d1', name: 'Day 1 皇后鎮市區', color: '#e6194b', visible: true, stops: [
+      { id: 'demo-s11', name: '天空纜車 Skyline', lat: -45.0242, lng: 168.6535, type: '🎯', note: '上山看湖景、玩滑板車 Luge' },
+      { id: 'demo-s12', name: 'Fergburger', lat: -45.0312, lng: 168.6605, type: '🍽️', note: '排隊漢堡名店，建議避開正午' },
+      { id: 'demo-s13', name: '皇后鎮花園', lat: -45.0378, lng: 168.6644, type: '📍', note: '湖畔半島散步約 1 小時' },
+      { id: 'demo-s14', name: 'Steamer Wharf 湖畔碼頭', lat: -45.033, lng: 168.6577, type: '☕', note: '傍晚湖邊喝一杯看夕陽' }
+    ]},
+    { id: 'demo-d2', name: 'Day 2 箭鎮與酒莊', color: '#3cb44b', visible: true, stops: [
+      { id: 'demo-s21', name: '箭鎮 Arrowtown', lat: -44.9387, lng: 168.8348, type: '📍', note: '淘金老街，秋天楓葉最有名' },
+      { id: 'demo-s22', name: 'Kawarau 高空彈跳橋', lat: -45.0091, lng: 168.8555, type: '🎯', note: '世界第一個商業彈跳點，不跳用看的也過癮' },
+      { id: 'demo-s23', name: 'Gibbston Valley 酒莊', lat: -45.0117, lng: 168.9126, type: '🍽️', note: '午餐＋品酒' },
+      { id: 'demo-s24', name: '海斯湖 Lake Hayes', lat: -44.9917, lng: 168.809, type: '📍', note: '環湖步道來回約 2 小時' }
+    ]},
+    { id: 'demo-d3', name: 'Day 3 格萊諾基', color: '#4363d8', visible: true, stops: [
+      { id: 'demo-s31', name: 'Bennetts Bluff 觀景點', lat: -45.0288, lng: 168.4386, type: '📍', note: '皇后鎮往格萊諾基沿湖公路最美一站' },
+      { id: 'demo-s32', name: '格萊諾基碼頭', lat: -44.8494, lng: 168.3832, type: '📍', note: '魔戒取景地、紅色小屋' },
+      { id: 'demo-s33', name: "Mrs Woolly's General Store", lat: -44.848, lng: 168.385, type: '🛒', note: '小鎮伴手好店' }
+    ]}
+  ]
+};
+function openWelcome() { document.getElementById('welcomeModal').classList.add('open'); }
+function closeWelcome() {
+  document.getElementById('welcomeModal').classList.remove('open');
+  try { localStorage.setItem(WELCOME_KEY, '1'); } catch (e) {}
+}
+document.getElementById('welcomeStartBtn').addEventListener('click', closeWelcome);
+document.getElementById('helpBtn').addEventListener('click', openWelcome);
+document.getElementById('welcomeModal').addEventListener('click', e => {
+  if (e.target.id === 'welcomeModal') closeWelcome();
+});
+document.getElementById('welcomeDemoBtn').addEventListener('click', () => {
+  const hasData = state.days.some(d => d.stops.length);
+  if (hasData && !confirm('載入範例會取代目前畫面上的行程（可按 Ctrl+Z 復原）。繼續嗎？')) return;
+  pushUndo();
+  state = JSON.parse(JSON.stringify(DEMO_TRIP));
+  Object.keys(routeCache).forEach(k => delete routeCache[k]);
+  document.getElementById('startDate').value = '';
+  saveState(); renderAll();
+  map.setView([state.view.lat, state.view.lng], state.view.zoom);
+  closeWelcome();
+  track('demo_loaded');
+  toast('已載入範例：皇后鎮 3 天小旅行，隨意玩玩看！');
+});
+
 /* ============ 啟動 ============ */
 if (state.startDate) startDateInput.value = state.startDate;
 renderAll();
+// 第一次來、且還沒排任何行程 → 顯示導覽
+if (!localStorage.getItem(WELCOME_KEY) && !state.days.some(d => d.stops.length)) openWelcome();
 track('planner_loaded', { days: state.days.length });
 setTimeout(() => { const h = document.getElementById('hint'); if (h) h.style.opacity = '0'; }, 8000);
 </script>
