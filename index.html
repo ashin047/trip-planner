@@ -253,6 +253,20 @@
     cursor: pointer; padding: 0; width: 32px; flex-shrink: 0;
     font-family: inherit; outline: none;
   }
+  .day-note {
+    width: 100%;
+    border: none;
+    border-top: 1px dashed var(--border);
+    background: #f6f2e9;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--text);
+    resize: none;
+    outline: none;
+    display: block;
+  }
+  .day-note::placeholder { color: #a89f8d; }
   .leg-row {
     padding: 3px 10px 3px 44px;
     font-size: 12px;
@@ -1007,6 +1021,59 @@ window.__stopAction = function (act, dayId, stopId) {
   return false;
 };
 
+/* ===== 地點營業資訊（OpenStreetMap extratags：營業時間/電話/官網） ===== */
+const poiCache = {};   // stop.id → { hours, phone, web } | { none:true } | null(查詢中)
+function fmtHours(h) {
+  return h.replace(/Mo/g, '一').replace(/Tu/g, '二').replace(/We/g, '三').replace(/Th/g, '四')
+    .replace(/Fr/g, '五').replace(/Sa/g, '六').replace(/Su/g, '日')
+    .replace(/PH/g, '假日').replace(/\boff\b/g, '休').replace(/24\/7/g, '24 小時營業');
+}
+function popupHtml(day, stop, i, poi) {
+  const affLink = stop.type === '🛏️'
+    ? `<br><a data-aff="booking" href="https://www.booking.com/searchresults.zh-tw.html?ss=${encodeURIComponent(stop.name)}&aid=1321287&label=shin-planner-stay" target="_blank" rel="sponsored nofollow noopener">🔍 找這附近的住宿（Booking.com）</a>`
+    : (stop.type === '🎯'
+      ? `<br><a data-aff="kkday" href="https://www.kkday.com/zh-tw/search?keyword=${encodeURIComponent(stop.name)}&cid=19977" target="_blank" rel="sponsored nofollow noopener">🎟️ 找類似體驗（KKday）</a>`
+      : '');
+  let poiHtml = '';
+  if (poi === null) {
+    poiHtml = `<br><span style="color:#7b7466;font-size:12px">⏳ 查詢營業資訊…</span>`;
+  } else if (poi && !poi.none) {
+    const rows = [];
+    if (poi.hours) rows.push(`⏰ ${esc(fmtHours(poi.hours))}`);
+    if (poi.phone) rows.push(`☎️ <a href="tel:${esc(poi.phone)}">${esc(poi.phone)}</a>`);
+    if (poi.web) rows.push(`🌐 <a href="${esc(poi.web)}" target="_blank" rel="noopener">官方網站</a>`);
+    poiHtml = `<br><span style="font-size:12px;line-height:1.7">${rows.join('<br>')}</span>`;
+  }
+  return `<b>${esc(day.name)}・第 ${i + 1} 站</b><br>${stop.type || '📍'} ${esc(stop.name)}` +
+    (stop.note ? `<br><span style="color:#7a8194">${esc(stop.note)}</span>` : '') +
+    poiHtml +
+    `<br><span class="popup-actions">` +
+    `<a href="#" onclick="return __stopAction('rename','${day.id}','${stop.id}')">✏️ 改名</a>　` +
+    `<a href="#" onclick="return __stopAction('delete','${day.id}','${stop.id}')" style="color:#d93025">🗑️ 移除</a>` +
+    `</span>` +
+    `<br><a href="https://www.google.com/maps/search/?api=1&query=${stop.lat},${stop.lng}" target="_blank">在 Google Maps 開啟</a>` +
+    affLink;
+}
+async function ensurePoi(stop, day, i, mk) {
+  if (poiCache[stop.id] !== undefined) return;
+  poiCache[stop.id] = null;
+  mk.getPopup().setContent(popupHtml(day, stop, i, null));
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${stop.lat}&lon=${stop.lng}&zoom=18&extratags=1&accept-language=zh-TW`);
+    const d = await r.json();
+    const et = (d && d.extratags) || {};
+    const poi = {
+      hours: et.opening_hours || null,
+      phone: et.phone || et['contact:phone'] || null,
+      web: et.website || et['contact:website'] || null
+    };
+    poiCache[stop.id] = (poi.hours || poi.phone || poi.web) ? poi : { none: true };
+  } catch (e) {
+    poiCache[stop.id] = { none: true };
+  }
+  if (mk.isPopupOpen && mk.isPopupOpen()) mk.getPopup().setContent(popupHtml(day, stop, i, poiCache[stop.id]));
+}
+
 function renderMap() {
   // 記住重繪前開著的彈窗，重建後還原（路線算完的重繪才不會把剛打開的彈窗關掉）
   let openStopId = null;
@@ -1032,27 +1099,15 @@ function renderMap() {
         popupAnchor: [0, -15]
       });
       const mk = L.marker([stop.lat, stop.lng], { icon, draggable: true }).addTo(overlay);
-      const affLink = stop.type === '🛏️'
-        ? `<br><a data-aff="booking" href="https://www.booking.com/searchresults.zh-tw.html?ss=${encodeURIComponent(stop.name)}&aid=1321287&label=shin-planner-stay" target="_blank" rel="sponsored nofollow noopener">🔍 找這附近的住宿（Booking.com）</a>`
-        : (stop.type === '🎯'
-          ? `<br><a data-aff="kkday" href="https://www.kkday.com/zh-tw/search?keyword=${encodeURIComponent(stop.name)}&cid=19977" target="_blank" rel="sponsored nofollow noopener">🎟️ 找類似體驗（KKday）</a>`
-          : '');
-      mk.bindPopup(
-        `<b>${esc(day.name)}・第 ${i + 1} 站</b><br>${stop.type || '📍'} ${esc(stop.name)}` +
-        (stop.note ? `<br><span style="color:#7a8194">${esc(stop.note)}</span>` : '') +
-        `<br><span class="popup-actions">` +
-        `<a href="#" onclick="return __stopAction('rename','${day.id}','${stop.id}')">✏️ 改名</a>　` +
-        `<a href="#" onclick="return __stopAction('delete','${day.id}','${stop.id}')" style="color:#d93025">🗑️ 移除</a>` +
-        `</span>` +
-        `<br><a href="https://www.google.com/maps/search/?api=1&query=${stop.lat},${stop.lng}" target="_blank">在 Google Maps 開啟</a>` +
-        affLink
-      );
+      mk.bindPopup(popupHtml(day, stop, i, poiCache[stop.id]));
+      mk.on('popupopen', () => ensurePoi(stop, day, i, mk));
       markersById[stop.id] = mk;
       mk.on('dragend', e => {
         pushUndo();
         const p = e.target.getLatLng();
         stop.lat = +p.lat.toFixed(6);
         stop.lng = +p.lng.toFixed(6);
+        delete poiCache[stop.id];   // 位置變了，營業資訊重查
         delete routeCache[day.id];
         saveState(); renderAll();
       });
@@ -1275,6 +1330,18 @@ function renderSidebar() {
       saveState(); renderAll();
     });
     card.appendChild(header);
+
+    // 每日備註（有內容時永遠顯示；選中的那天也顯示，方便隨時記）
+    if (day.note || day.id === state.activeDayId) {
+      const noteEl = document.createElement('textarea');
+      noteEl.className = 'day-note';
+      noteEl.rows = day.note && day.note.length > 40 ? 2 : 1;
+      noteEl.placeholder = '📝 這一天的備註（住宿、提醒、訂位…）';
+      noteEl.value = day.note || '';
+      noteEl.setAttribute('aria-label', day.name + ' 的備註');
+      noteEl.addEventListener('change', () => { day.note = noteEl.value.trim(); saveState(); });
+      card.appendChild(noteEl);
+    }
 
     // stops
     const ul = document.createElement('ul');
@@ -1893,7 +1960,8 @@ function kmlColor(hex) {
 document.getElementById('exportKmlBtn').addEventListener('click', () => {
   let kml = '<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>行程路線</name>\n';
   state.days.forEach((day, di) => {
-    kml += `<Folder><name>${escXml(dayDateLabel(di) + day.name)}</name>\n`;
+    kml += `<Folder><name>${escXml(dayDateLabel(di) + day.name)}</name>` +
+      (day.note ? `<description>${escXml(day.note)}</description>` : '') + '\n';
     day.stops.forEach((s, i) => {
       kml += `<Placemark><name>${escXml(`${i + 1}. ${s.name}`)}</name>` +
         (s.note ? `<description>${escXml(s.note)}</description>` : '') +
@@ -1941,6 +2009,7 @@ function buildTripText() {
   state.days.forEach((day, di) => {
     const dateLabel = dayDateLabel(di).replace(/・$/, '');
     lines.push(`📅 ${day.name}${dateLabel ? `｜${dateLabel}` : ''}`);
+    if (day.note) lines.push(`📝 ${day.note}`);
     if (!day.stops.length) { lines.push('（尚未安排）', ''); return; }
     const cached = routeCache[day.id];
     const cacheOk = cached && cached.key === routeKey(day) && cached.parts;
