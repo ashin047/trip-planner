@@ -398,16 +398,28 @@
   .tools-header .t-title { font-size: 13px; font-weight: 700; }
   .tools-header .t-brand { font-size: 11px; color: var(--muted); }
   .tools-header .t-brand a { color: var(--accent); text-decoration: none; }
-  #toolsGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 12px 8px; }
+  #toolsGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; padding: 0 12px 8px; }
   .tool-link {
-    display: flex; align-items: center; gap: 6px;
-    padding: 7px 9px;
-    border: 1px solid var(--border); border-radius: 8px;
-    background: #fff; font-size: 12px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--border); border-radius: 11px;
+    background: #fffdf7;
     text-decoration: none; color: var(--text);
-    white-space: nowrap; overflow: hidden;
+    min-width: 0;
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform 80ms var(--ease);
   }
-  .tool-link:hover { border-color: var(--accent); color: var(--accent); }
+  .tool-link:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(71,105,92,.14); }
+  .tool-link:active { transform: scale(.98); }
+  .tl-ico {
+    width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .tl-txt { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
+  .tl-txt b { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tl-txt small { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tool-link.tl-wide { grid-column: 1 / -1; }
+  .tool-link.tl-wide .tl-txt b { font-family: var(--serif); font-size: 13px; }
   #toolsDisclosure { font-size: 10.5px; color: var(--muted); padding: 0 12px 9px; line-height: 1.5; }
 
   /* 移到其他天的下拉（只顯示 📆 圖示） */
@@ -643,15 +655,15 @@
       </div>
       <div id="toolsBody">
         <div id="toolsGrid">
-          <a class="tool-link" data-aff="skyscanner" href="https://skyscanner.pxf.io/vNdPBd" target="_blank" rel="sponsored nofollow noopener">✈️ 機票比價</a>
-          <a class="tool-link" data-aff="esim" href="https://ashin.esimart.cc" target="_blank" rel="sponsored nofollow noopener">📶 上網 eSIM</a>
-          <a class="tool-link" data-aff="airportrentals" href="https://www.airportrentals.com/zh?affiliate=shin" target="_blank" rel="sponsored nofollow noopener">🚗 自駕租車</a>
-          <a class="tool-link" data-aff="motorhomerepublic" href="https://www.motorhomerepublic.com/zh?affiliate=shin" target="_blank" rel="sponsored nofollow noopener">🚐 露營車出租</a>
-          <a class="tool-link" data-aff="booking" href="https://www.booking.com/index.zh-tw.html?aid=1321287&label=shin-planner-tools" target="_blank" rel="sponsored nofollow noopener">🛏️ Booking 訂房</a>
-          <a class="tool-link" data-aff="agoda" href="https://www.agoda.com/zh-tw?cid=1961999" target="_blank" rel="sponsored nofollow noopener">🛏️ Agoda 訂房</a>
-          <a class="tool-link" data-aff="kkday" href="https://www.kkday.com/zh-tw?cid=19977" target="_blank" rel="sponsored nofollow noopener">🎟️ KKday 票券</a>
-          <a class="tool-link" data-aff="klook" href="https://www.klook.com/zh-TW/?aid=71699" target="_blank" rel="sponsored nofollow noopener">🎟️ Klook 票券</a>
-          <a class="tool-link" data-aff="shinshing" href="https://shinshing.tw" target="_blank" rel="noopener" style="grid-column:1/-1">📖 紐西蘭自由行攻略(shinshing)</a>
+          <a class="tool-link" data-aff="skyscanner" href="https://skyscanner.pxf.io/vNdPBd" target="_blank" rel="sponsored nofollow noopener"><span class="tl-ico" style="background:#e7edf4">✈️</span><span class="tl-txt"><b>機票比價</b><small>Skyscanner</small></span></a>
+          <a class="tool-link" data-aff="esim" href="https://ashin.esimart.cc" target="_blank" rel="sponsored nofollow noopener"><span class="tl-ico" style="background:#e6efe9">📶</span><span class="tl-txt"><b>上網 eSIM</b><small>eSIMart 專屬頁</small></span></a>
+          <a class="tool-link" data-aff="airportrentals" href="https://www.airportrentals.com/zh?affiliate=shin" target="_blank" rel="sponsored nofollow noopener"><span class="tl-ico" style="background:#f4e9de">🚗</span><span class="tl-txt"><b>自駕租車</b><small>Airport Rentals</small></span></a>
+          <a class="tool-link" data-aff="motorhomerepublic" href="https://www.motorhomerepublic.com/zh?affiliate=shin" target="_blank" rel="sponsored nofollow noopener"><span class="tl-ico" style="background:#eef0e3">🚐</span><span class="tl-txt"><b>露營車出租</b><small>Motorhome Republic</small></span></a>
+          <a class="tool-link" data-aff="booking" href="https://www.booking.com/index.zh-tw.html?aid=1321287&label=shin-planner-tools" target="_blank" rel="sponsored nofollow noopener"><span class="tl-ico" style="background:#ece7f0">🛏️</span><span class="tl-txt"><b>Booking 訂房</b><small>全球住宿</small></span></a>
+          <a class="tool-link" data-aff="agoda" href="https://www.agoda.com/zh-tw?cid=1961999" target="_blank" rel="sponsored nofollow noopener"><span class="tl-ico" style="background:#f3e7ea">🛏️</span><span class="tl-txt"><b>Agoda 訂房</b><small>亞洲住宿</small></span></a>
+          <a class="tool-link" data-aff="kkday" href="https://www.kkday.com/zh-tw?cid=19977" target="_blank" rel="sponsored nofollow noopener"><span class="tl-ico" style="background:#e5eff0">🎟️</span><span class="tl-txt"><b>KKday 票券</b><small>行程體驗</small></span></a>
+          <a class="tool-link" data-aff="klook" href="https://www.klook.com/zh-TW/?aid=71699" target="_blank" rel="sponsored nofollow noopener"><span class="tl-ico" style="background:#f2ece0">🎟️</span><span class="tl-txt"><b>Klook 票券</b><small>景點門票</small></span></a>
+          <a class="tool-link tl-wide" data-aff="shinshing" href="https://shinshing.tw" target="_blank" rel="noopener"><span class="tl-ico" style="background:#e9efe8">📖</span><span class="tl-txt"><b>紐西蘭自由行攻略</b><small>shinshing.tw 深度文章</small></span></a>
         </div>
         <div id="toolsDisclosure">本工具免費使用。上列為合作夥伴連結，透過連結預訂我們會獲得少量回饋、你的價格不變，這能支持工具持續維護 🙏</div>
       </div>
