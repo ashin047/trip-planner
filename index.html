@@ -711,8 +711,8 @@ const ICONS = {
 const SITE_CONFIG = {
   // GA4 評估 ID（資源「紐西蘭旅遊攻略」→ 串流「行程規劃器 trip-planner」）；留空 = 不載入任何追蹤
   analyticsId: 'G-7LD9T7TJBX',
-  // 共同編輯後端（REST JSON 儲存，例如 Firebase RTDB 網址）；留空 = 共編功能顯示「開通中」
-  syncDbUrl: ''
+  // 共同編輯後端：Firebase RTDB（專案 trip-planner-sync，asia-southeast1）；留空 = 共編功能顯示「開通中」
+  syncDbUrl: 'https://trip-planner-sync-5ca5c-default-rtdb.asia-southeast1.firebasedatabase.app'
 };
 function track(name, params) {
   if (window.gtag) window.gtag('event', name, params || {});
@@ -1688,6 +1688,7 @@ window.SyncEngine = {
     try { localStorage.setItem(SYNC_KEY, id); } catch (e) {}
     clearInterval(this.pollTimer);
     this.pollTimer = setInterval(() => this.poll(), 8000);
+    this.poll();
     updateSyncUI();
   },
   leave() {
@@ -1768,6 +1769,11 @@ document.getElementById('leaveSyncBtn').addEventListener('click', () => {
   if (!confirm('結束共同編輯？行程會留在你這裡，但之後的改動不再同步。')) return;
   window.SyncEngine.leave();
   toast('已結束共同編輯');
+});
+
+/* 切回分頁時立刻同步一次（背景時輪詢暫停以節省流量） */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && window.SyncEngine.active) window.SyncEngine.poll();
 });
 
 /* 開站時處理分享/共編連結，回傳是否吃掉了 hash */
