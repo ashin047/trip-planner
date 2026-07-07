@@ -281,6 +281,20 @@
     gap: 8px;
     flex-wrap: wrap;
   }
+  #moreTools { display: none; gap: 8px; flex-wrap: wrap; width: 100%; padding-top: 2px; }
+  #moreTools.open { display: flex; }
+  .popup-actions a { text-decoration: none; font-size: 12.5px; }
+  .help-q {
+    display: inline-flex; width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid var(--accent); color: var(--accent);
+    font-weight: 700; font-size: 11.5px;
+    align-items: center; justify-content: center;
+  }
+  .touch-only { display: none !important; }
+  @media (pointer: coarse) {
+    .touch-only { display: inline-flex !important; }
+    .stop-actions { display: grid; grid-template-columns: repeat(2, auto); }
+  }
 
   /* ===== Map ===== */
   #map { flex: 1; min-width: 0; z-index: 1; }
@@ -559,12 +573,13 @@
     <option value="y">Google 混合圖</option>
     <option value="p">Google 地形圖</option>
   </select>
-  <select id="routeMode" class="btn" title="路線模式" aria-label="路線計算模式">
-    <option value="driving">🚗 實際開車路線</option>
-    <option value="straight">📏 直線連接</option>
+  <select id="routeMode" class="btn" title="站與站之間的路線怎麼畫：實際開車路線（含距離車程），或簡單直線" aria-label="路線計算模式">
+    <option value="driving">🚗 路線：實際開車</option>
+    <option value="straight">📏 路線：直線（概略）</option>
   </select>
-  <select id="quickJump" class="btn" title="快速定位" aria-label="快速定位到城市">
-    <option value="">快速定位…</option>
+  <select id="quickJump" class="btn" title="快速把地圖移到某個地區" aria-label="快速定位到地區">
+    <option value="">熱門地區…</option>
+    <option value="me">📍 我的位置</option>
     <option value="23.7,121,8">台灣</option>
     <option value="-36.85,174.76,10">奧克蘭</option>
     <option value="-38.7,176.1,9">羅托魯瓦／陶波</option>
@@ -574,7 +589,7 @@
     <option value="-45.03,168.66,10">皇后鎮</option>
     <option value="-45.87,170.5,11">但尼丁</option>
   </select>
-  <button class="btn" id="helpBtn" title="使用說明" aria-label="使用說明">❓</button>
+  <button class="btn" id="helpBtn" title="使用說明" aria-label="使用說明"><span class="help-q">?</span></button>
 </div>
 
 <div id="main">
@@ -612,12 +627,15 @@
     </div>
     <div id="sidebarFooter">
       <button class="btn primary" id="shareBtn">🔗 分享／共編</button>
-      <button class="btn" id="saveManagerBtn">🗂️ 存檔管理</button>
+      <button class="btn" id="saveManagerBtn">🗂️ 行程版本</button>
       <button class="btn" id="copyTextBtn">📋 複製文字行程</button>
-      <button class="btn" id="exportKmlBtn">🌍 匯出 KML</button>
-      <button class="btn" id="exportBtn">💾 匯出 JSON</button>
-      <button class="btn" id="importBtn">📂 匯入 JSON</button>
-      <button class="btn" id="clearBtn">🗑️ 全部清空</button>
+      <button class="btn" id="moreToolsBtn" aria-expanded="false">⋯ 更多</button>
+      <div id="moreTools">
+        <button class="btn" id="exportBtn">💾 備份到檔案</button>
+        <button class="btn" id="importBtn">📂 從備份還原</button>
+        <button class="btn" id="exportKmlBtn">🌍 匯到 Google My Maps</button>
+        <button class="btn" id="clearBtn">🗑️ 全部清空</button>
+      </div>
       <input type="file" id="importFile" accept=".json" style="display:none">
     </div>
   </div>
@@ -680,7 +698,7 @@
 <div id="saveModal">
   <div class="modal-box">
     <div class="modal-header">
-      <span class="title">🗂️ 存檔管理</span>
+      <span class="title">🗂️ 行程版本（快照存檔）</span>
       <button class="icon-btn" id="saveModalClose" title="關閉" style="font-size:18px">✕</button>
     </div>
     <div class="modal-body">
@@ -832,8 +850,35 @@ function undo() {
 }
 
 /* ============ 渲染：地圖 ============ */
+let markersById = {};
+window.__stopAction = function (act, dayId, stopId) {
+  const day = getDay(dayId);
+  if (!day) return false;
+  const idx = day.stops.findIndex(s => s.id === stopId);
+  if (idx < 0) return false;
+  const stop = day.stops[idx];
+  if (act === 'rename') {
+    const v = prompt('這個地點的名稱：', stop.name);
+    if (v && v.trim()) { pushUndo(); stop.name = v.trim(); saveState(); renderAll(); toast('已改名為「' + stop.name + '」'); }
+  } else if (act === 'delete') {
+    if (confirm('移除「' + stop.name + '」？（可用復原鍵救回）')) {
+      pushUndo();
+      day.stops.splice(idx, 1);
+      delete routeCache[day.id];
+      map.closePopup();
+      saveState(); renderAll();
+      toast('已移除，按 ↩️ 可復原');
+    }
+  }
+  return false;
+};
+
 function renderMap() {
+  // 記住重繪前開著的彈窗，重建後還原（路線算完的重繪才不會把剛打開的彈窗關掉）
+  let openStopId = null;
+  Object.entries(markersById).forEach(([id, m]) => { if (m.isPopupOpen && m.isPopupOpen()) openStopId = id; });
   overlay.clearLayers();
+  markersById = {};
   state.days.forEach(day => {
     if (!day.visible) return;
     // 標記
@@ -861,9 +906,14 @@ function renderMap() {
       mk.bindPopup(
         `<b>${esc(day.name)}・第 ${i + 1} 站</b><br>${stop.type || '📍'} ${esc(stop.name)}` +
         (stop.note ? `<br><span style="color:#7a8194">${esc(stop.note)}</span>` : '') +
+        `<br><span class="popup-actions">` +
+        `<a href="#" onclick="return __stopAction('rename','${day.id}','${stop.id}')">✏️ 改名</a>　` +
+        `<a href="#" onclick="return __stopAction('delete','${day.id}','${stop.id}')" style="color:#d93025">🗑️ 移除</a>` +
+        `</span>` +
         `<br><a href="https://www.google.com/maps/search/?api=1&query=${stop.lat},${stop.lng}" target="_blank">在 Google Maps 開啟</a>` +
         affLink
       );
+      markersById[stop.id] = mk;
       mk.on('dragend', e => {
         pushUndo();
         const p = e.target.getLatLng();
@@ -876,6 +926,8 @@ function renderMap() {
     // 路線
     if (day.stops.length >= 2) drawRoute(day);
   });
+  // 還原重繪前開著的彈窗
+  if (openStopId && markersById[openStopId]) markersById[openStopId].openPopup();
 }
 
 function routeKey(day) {
@@ -1112,6 +1164,8 @@ function renderSidebar() {
           <textarea class="stop-note" rows="1" placeholder="備註（時間、票價…）">${esc(stop.note || '')}</textarea>
         </div>
         <div class="stop-actions">
+          <button class="icon-btn touch-only" data-act="mvup" title="上移" aria-label="這個地點往上移">${ICONS.up}</button>
+          <button class="icon-btn touch-only" data-act="mvdown" title="下移" aria-label="這個地點往下移">${ICONS.down}</button>
           <button class="icon-btn" data-act="focus" title="在地圖上顯示" aria-label="在地圖上顯示這個地點">${ICONS.pin}</button>
           <select class="stop-move" title="移到其他天" aria-label="把這個地點移到其他天">
             <option value="">📆</option>
@@ -1145,6 +1199,22 @@ function renderSidebar() {
       li.querySelector('[data-act="focus"]').addEventListener('click', () => {
         map.setView([stop.lat, stop.lng], Math.max(map.getZoom(), 13));
         if (window.innerWidth <= 760) document.getElementById('sidebar').classList.remove('open');
+      });
+      li.querySelector('[data-act="mvup"]').addEventListener('click', () => {
+        if (si === 0) return;
+        pushUndo();
+        day.stops.splice(si, 1);
+        day.stops.splice(si - 1, 0, stop);
+        delete routeCache[day.id];
+        saveState(); renderAll();
+      });
+      li.querySelector('[data-act="mvdown"]').addEventListener('click', () => {
+        if (si >= day.stops.length - 1) return;
+        pushUndo();
+        day.stops.splice(si, 1);
+        day.stops.splice(si + 1, 0, stop);
+        delete routeCache[day.id];
+        saveState(); renderAll();
       });
       li.querySelector('[data-act="del"]').addEventListener('click', () => {
         pushUndo();
@@ -1230,10 +1300,19 @@ function addStop(lat, lng, name) {
     state.activeDayId = day.id;
   }
   if (!day.visible) day.visible = true; // 加點時自動顯示該天，避免「加了卻看不到」
-  day.stops.push({ id: uid(), name: name || `地點 ${day.stops.length + 1}`, lat: +lat.toFixed(6), lng: +lng.toFixed(6), note: '', type: '📍' });
+  const newStop = { id: uid(), name: name || `地點 ${day.stops.length + 1}`, lat: +lat.toFixed(6), lng: +lng.toFixed(6), note: '', type: '📍' };
+  day.stops.push(newStop);
   delete routeCache[day.id];
   saveState(); renderAll();
   toast(`已加入「${day.name}」：${name || '未命名地點'}`);
+  // 打開新地點的彈窗，讓使用者立刻能改名/移除（手機上尤其重要）
+  const mk = markersById[newStop.id];
+  if (mk) mk.openPopup();
+  // 工具箱：新手排到第 3 站時自動展開（未手動設定過才自動）
+  if (localStorage.getItem('trip-map-planner-tools-collapsed') === null) {
+    const tot = state.days.reduce((n, d) => n + d.stops.length, 0);
+    if (tot === 3) setToolsCollapsed(false, false);
+  }
   track('add_stop');
 }
 
@@ -1305,10 +1384,20 @@ function openInGoogleMaps(day) {
 document.getElementById('mapType').addEventListener('change', e => setBaseLayer(e.target.value));
 document.getElementById('routeMode').addEventListener('change', () => renderAll());
 document.getElementById('quickJump').addEventListener('change', e => {
-  if (!e.target.value) return;
-  const [lat, lng, z] = e.target.value.split(',').map(Number);
-  map.setView([lat, lng], z);
+  const v = e.target.value;
   e.target.value = '';
+  if (!v) return;
+  if (v === 'me') {
+    if (!navigator.geolocation) { toast('這個瀏覽器不支援定位'); return; }
+    toast('取得定位中…');
+    navigator.geolocation.getCurrentPosition(
+      p => map.setView([p.coords.latitude, p.coords.longitude], 13),
+      () => toast('無法取得位置，請允許瀏覽器的定位權限')
+    );
+    return;
+  }
+  const [lat, lng, z] = v.split(',').map(Number);
+  map.setView([lat, lng], z);
 });
 
 /* ============ 側欄按鈕 ============ */
@@ -1369,6 +1458,11 @@ document.getElementById('clearBtn').addEventListener('click', () => {
 
 document.getElementById('sidebarToggle').addEventListener('click', () => {
   document.getElementById('sidebar').classList.toggle('open');
+});
+document.getElementById('moreToolsBtn').addEventListener('click', () => {
+  const mt = document.getElementById('moreTools');
+  const open = mt.classList.toggle('open');
+  document.getElementById('moreToolsBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
 });
 document.getElementById('sidebarBackdrop').addEventListener('click', () => {
   document.getElementById('sidebar').classList.remove('open');
@@ -1627,13 +1721,18 @@ searchInput.addEventListener('input', () => {
 /* ============ 旅遊工具箱收合 ============ */
 const toolsToggle = document.getElementById('toolsToggle');
 const toolsBody = document.getElementById('toolsBody');
-function setToolsCollapsed(collapsed) {
+function setToolsCollapsed(collapsed, persist = true) {
   toolsBody.style.display = collapsed ? 'none' : '';
   document.getElementById('toolsChevron').textContent = collapsed ? '▸' : '▾';
-  try { localStorage.setItem('trip-map-planner-tools-collapsed', collapsed ? '1' : '0'); } catch (e) {}
+  if (persist) { try { localStorage.setItem('trip-map-planner-tools-collapsed', collapsed ? '1' : '0'); } catch (e) {} }
 }
 toolsToggle.addEventListener('click', () => setToolsCollapsed(toolsBody.style.display !== 'none'));
-setToolsCollapsed(localStorage.getItem('trip-map-planner-tools-collapsed') === '1');
+// 沒手動設定過 → 依「排了幾站」決定：還沒開始排的新手先收合，減少干擾
+{
+  const pref = localStorage.getItem('trip-map-planner-tools-collapsed');
+  const tot = state.days.reduce((n, d) => n + d.stops.length, 0);
+  setToolsCollapsed(pref === null ? tot < 3 : pref === '1', false);
+}
 
 /* ============ 分享與共同編輯 ============ */
 const SYNC_KEY = 'trip-map-planner-sync-v1';
@@ -1879,6 +1978,13 @@ function openWelcome() { document.getElementById('welcomeModal').classList.add('
 function closeWelcome() {
   document.getElementById('welcomeModal').classList.remove('open');
   try { localStorage.setItem(WELCOME_KEY, '1'); } catch (e) {}
+  startHintTimer(); // 導覽關閉後，底部提示才開始倒數
+}
+let hintTimerStarted = false;
+function startHintTimer() {
+  if (hintTimerStarted) return;
+  hintTimerStarted = true;
+  setTimeout(() => { const h = document.getElementById('hint'); if (h) h.style.opacity = '0'; }, 8000);
 }
 document.getElementById('welcomeStartBtn').addEventListener('click', closeWelcome);
 document.getElementById('helpBtn').addEventListener('click', openWelcome);
@@ -1904,9 +2010,12 @@ if (state.startDate) startDateInput.value = state.startDate;
 renderAll();
 const hashHandled = bootShareSync();
 // 第一次來、且還沒排任何行程、也不是點分享連結進來 → 顯示導覽
-if (!hashHandled && !localStorage.getItem(WELCOME_KEY) && !state.days.some(d => d.stops.length)) openWelcome();
+if (!hashHandled && !localStorage.getItem(WELCOME_KEY) && !state.days.some(d => d.stops.length)) {
+  openWelcome();
+} else {
+  startHintTimer();
+}
 track('planner_loaded', { days: state.days.length });
-setTimeout(() => { const h = document.getElementById('hint'); if (h) h.style.opacity = '0'; }, 8000);
 </script>
 </body>
 </html>
