@@ -110,9 +110,46 @@
     transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
   }
   #searchInput:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); }
-  /* 頂欄次要控制項在第一屏視覺弱化，把注意力留給搜尋 */
-  #topbar > select.btn { color: var(--muted); border-color: var(--border); }
-  #topbar > select.btn:hover { color: var(--text); }
+  /* 「加入到 Day X」指示器 */
+  #dayTargetWrap {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--accent-soft);
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    border-radius: 20px; padding: 4px 6px 4px 12px;
+    flex-shrink: 0; white-space: nowrap;
+  }
+  #dayTargetWrap .dt-label { font-size: 12.5px; color: var(--accent); font-weight: 600; }
+  #dayTarget {
+    border: none; background: transparent; outline: none;
+    font-family: inherit; font-size: 13px; font-weight: 700; color: var(--accent-strong);
+    cursor: pointer; max-width: 130px;
+    -webkit-appearance: none; appearance: none;
+    padding-right: 16px;
+    background: no-repeat right center/12px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2338564b' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  }
+  /* 設定 popover */
+  #settingsWrap { position: relative; flex-shrink: 0; }
+  #settingsPanel {
+    display: none;
+    position: absolute; top: 42px; right: 0;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow-lg);
+    padding: 10px; width: 250px; z-index: 1300;
+  }
+  #settingsPanel.open { display: block; }
+  #settingsPanel .set-row {
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: 12px; color: var(--muted); font-weight: 600;
+    margin-bottom: 10px;
+  }
+  #settingsPanel .set-row:last-child { margin-bottom: 0; }
+  #settingsPanel .set-row select {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-family: inherit; font-size: 13px;
+    color: var(--text); background: var(--panel); cursor: pointer; outline: none;
+  }
+  #settingsPanel .set-row select:focus { border-color: var(--accent); }
+  #settingsBtn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
   #searchResults {
     position: absolute;
     top: 42px; left: 0; right: 0;
@@ -126,9 +163,26 @@
     z-index: 1200;
     padding: 4px;
   }
-  .search-item { padding: 9px 11px; font-size: 13px; cursor: pointer; border-radius: 8px; transition: background var(--dur) var(--ease); }
+  .search-item { display: flex; align-items: center; gap: 8px; padding: 8px 9px 8px 11px; font-size: 13px; cursor: pointer; border-radius: 8px; transition: background var(--dur) var(--ease); }
   .search-item:hover { background: var(--accent-soft); }
-  .search-item .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .search-item.search-loading { color: var(--muted); cursor: default; }
+  .search-item.search-loading:hover { background: transparent; }
+  .search-item .si-body { flex: 1; min-width: 0; }
+  .search-item .si-name { display: flex; align-items: center; gap: 5px; }
+  .search-item .si-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .search-item .sub { color: var(--muted); font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .search-item .si-flag { font-size: 14px; flex-shrink: 0; }
+  .si-add {
+    flex-shrink: 0;
+    display: inline-flex; align-items: center; gap: 2px;
+    border: 1px solid var(--accent); border-radius: 16px;
+    background: var(--panel); color: var(--accent);
+    font-family: inherit; font-size: 12px; font-weight: 700;
+    padding: 6px 11px; cursor: pointer;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+  .si-add:hover { background: var(--accent); color: #fff; }
+  .si-add .si-add-day { font-weight: 700; }
   .dict-badge {
     display: inline-block; margin-left: 6px; padding: 1px 7px;
     border-radius: 8px; background: var(--accent-soft); color: var(--accent);
@@ -302,6 +356,8 @@
   .stop-item:first-child::before { top: 13px; }
   .stop-item:last-of-type::before { bottom: calc(100% - 13px); }
   .stop-item:hover { background: color-mix(in srgb, var(--day-c, var(--accent)) 6%, transparent); }
+  @keyframes justAdded { 0% { background: color-mix(in srgb, var(--day-c, var(--accent)) 32%, transparent); } 100% { background: transparent; } }
+  .stop-item.just-added { animation: justAdded 1.4s var(--ease); }
   .stop-item.dragging { opacity: .4; }
   .stop-item.drag-over { box-shadow: inset 0 2px 0 var(--day-c, var(--accent)); }
   .stop-num {
@@ -847,6 +903,13 @@
       font-size: 14px; font-weight: 600;
     }
     #topbar h1 { display: none; }
+    /* 手機：搜尋佔滿第一行，加入到 Day X ＋設定退到第二行左側 */
+    #topbar { gap: 8px; padding: 8px 10px; }
+    #searchWrap { flex-basis: 100%; max-width: none; order: 1; }
+    #dayTargetWrap { order: 2; }
+    #settingsWrap { order: 3; margin-left: auto; }
+    #helpBtn { order: 4; }
+    #settingsPanel { right: 0; }
     /* iOS：輸入框 <16px 會觸發自動放大 */
     #searchInput, .stop-name, .stop-note, .day-name, #saveNameInput { font-size: 16px; }
     #hint { max-width: 92vw; white-space: normal; text-align: center; }
@@ -862,33 +925,48 @@
 <div id="topbar">
   <h1><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>行程路線規劃器</h1>
   <div id="searchWrap">
-    <input id="searchInput" type="text" placeholder="搜尋地點（例如：皇后鎮天空纜車）" aria-label="搜尋地點" autocomplete="off">
+    <input id="searchInput" type="text" placeholder="搜尋景點、餐廳、住宿… 加入行程" aria-label="搜尋地點加入行程" autocomplete="off">
     <div id="searchResults"></div>
   </div>
-  <select id="mapType" class="btn" title="底圖" aria-label="選擇地圖底圖">
-    <option value="carto" selected>🕊️ 極簡淺色（英文地名）</option>
-    <option value="m">Google 街道圖</option>
-    <option value="s">Google 衛星圖</option>
-    <option value="y">Google 混合圖</option>
-    <option value="p">Google 地形圖</option>
-  </select>
-  <select id="routeMode" class="btn" title="站與站之間的路線怎麼畫：實際開車路線（含距離車程），或簡單直線" aria-label="路線計算模式">
-    <option value="driving">🚗 路線：實際開車</option>
-    <option value="straight">📏 路線：直線（概略）</option>
-  </select>
-  <select id="quickJump" class="btn" title="快速把地圖移到某個地區" aria-label="快速定位到地區">
-    <option value="">熱門地區…</option>
-    <option value="me">📍 我的位置</option>
-    <option value="23.7,121,8">台灣</option>
-    <option value="-36.85,174.76,10">奧克蘭</option>
-    <option value="-38.7,176.1,9">羅托魯瓦／陶波</option>
-    <option value="-41.29,174.78,11">威靈頓</option>
-    <option value="-43.53,172.63,10">基督城</option>
-    <option value="-43.88,170.5,9">庫克山／蒂卡波</option>
-    <option value="-45.03,168.66,10">皇后鎮</option>
-    <option value="-45.87,170.5,11">但尼丁</option>
-  </select>
-  <button class="btn" id="helpBtn" title="使用說明" aria-label="使用說明"><span class="help-q">?</span></button>
+  <div id="dayTargetWrap" title="搜尋或點地圖加入的地點，會放到這一天">
+    <span class="dt-label">加入到</span>
+    <select id="dayTarget" aria-label="選擇新地點加入哪一天"></select>
+  </div>
+  <div id="settingsWrap">
+    <button class="btn icon-only" id="settingsBtn" title="地圖與路線選項" aria-label="地圖與路線選項" aria-expanded="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    <div id="settingsPanel" role="menu" aria-label="地圖與路線選項">
+      <label class="set-row">地圖底圖
+        <select id="mapType" aria-label="選擇地圖底圖">
+          <option value="carto" selected>🕊️ 極簡淺色（英文地名）</option>
+          <option value="m">Google 街道圖</option>
+          <option value="s">Google 衛星圖</option>
+          <option value="y">Google 混合圖</option>
+          <option value="p">Google 地形圖</option>
+        </select>
+      </label>
+      <label class="set-row">站間路線
+        <select id="routeMode" aria-label="路線計算模式">
+          <option value="driving">🚗 實際開車（含車程）</option>
+          <option value="straight">📏 直線（概略）</option>
+        </select>
+      </label>
+      <label class="set-row">快速定位
+        <select id="quickJump" aria-label="快速定位到地區">
+          <option value="">選一個地區…</option>
+          <option value="me">📍 我的位置</option>
+          <option value="23.7,121,8">台灣</option>
+          <option value="-36.85,174.76,10">奧克蘭</option>
+          <option value="-38.7,176.1,9">羅托魯瓦／陶波</option>
+          <option value="-41.29,174.78,11">威靈頓</option>
+          <option value="-43.53,172.63,10">基督城</option>
+          <option value="-43.88,170.5,9">庫克山／蒂卡波</option>
+          <option value="-45.03,168.66,10">皇后鎮</option>
+          <option value="-45.87,170.5,11">但尼丁</option>
+        </select>
+      </label>
+    </div>
+  </div>
+  <button class="btn icon-only" id="helpBtn" title="使用說明" aria-label="使用說明"><span class="help-q">?</span></button>
 </div>
 
 <div id="main">
@@ -1646,6 +1724,7 @@ function renderSidebar() {
     day.stops.forEach((stop, si) => {
       const li = document.createElement('li');
       li.className = 'stop-item';
+      li.dataset.stopid = stop.id;
       li.draggable = true;
       li.innerHTML = `
         <span class="stop-num" title="拖曳可排序">${si + 1}</span>
@@ -1786,6 +1865,7 @@ function renderSidebar() {
   });
   state.days.forEach(d => refreshLegs(d));
   refreshDateHint();
+  if (typeof updateDayTarget === 'function') updateDayTarget();
   // 空狀態浮水印：完全沒有地點時才顯示
   const totalStops = state.days.reduce((n, d) => n + d.stops.length, 0);
   const meh = document.getElementById('mapEmptyHint');
@@ -1808,7 +1888,14 @@ function addStop(lat, lng, name, type) {
   day.stops.push(newStop);
   delete routeCache[day.id];
   saveState(); renderAll();
-  toast(`已加入「${day.name}」：${name || '未命名地點'}`);
+  toast(`已加入 ${day.name}：${name || '未命名地點'}｜可繼續搜下一站`);
+  // 名片高亮新站＋捲入視野（加入成功的明確回饋）
+  const li = document.querySelector(`.stop-item[data-stopid="${newStop.id}"]`);
+  if (li) {
+    li.scrollIntoView({ block: 'nearest' });
+    li.classList.add('just-added');
+    setTimeout(() => li.classList.remove('just-added'), 1400);
+  }
   // 打開新地點的彈窗，讓使用者立刻能改名/移除（手機上尤其重要）
   const mk = markersById[newStop.id];
   if (mk) mk.openPopup();
@@ -1979,18 +2066,44 @@ function showPreview(lat, lng, name, type) {
   previewMarker = mk;
 }
 
-function appendSearchItem(main, sub, lat, lng, zoom, isDict, type) {
+function countryFlag(cc) {
+  if (!cc || cc.length !== 2) return '';
+  return String.fromCodePoint(...[...cc.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+}
+function activeDayShort() {
+  const d = activeDay();
+  if (!d) return 'Day 1';
+  const i = state.days.indexOf(d);
+  return (d.name && d.name.length <= 8) ? d.name : `Day ${i + 1}`;
+}
+
+/* 加入後：清空搜尋框、關結果、聚焦以便繼續加下一站，並在名片高亮新站 */
+function addFromSearch(lat, lng, name, type) {
+  if (previewMarker) { map.removeLayer(previewMarker); previewMarker = null; }
+  addStop(lat, lng, name, type);
+  searchResults.style.display = 'none';
+  searchInput.value = '';
+  if (window.innerWidth > 760) searchInput.focus();
+}
+
+function appendSearchItem(main, sub, lat, lng, zoom, isDict, type, flag) {
   const item = document.createElement('div');
   item.className = 'search-item';
   const tag = type === '✈️' ? '<span class="dict-badge" style="background:#e7edf4;color:#5b7da3">機場</span>'
     : type === '🚗' ? '<span class="dict-badge" style="background:#f4e9de;color:#bd7048">租車</span>'
-    : (isDict ? '<span class="dict-badge">精選</span>' : '');
-  item.innerHTML = `<div><b>${esc(main)}</b>${tag}</div><div class="sub">${esc(sub)}</div>`;
-  item.addEventListener('click', () => {
+    : (isDict ? '<span class="dict-badge">精選</span>' : (flag ? `<span class="si-flag">${flag}</span>` : ''));
+  item.innerHTML =
+    `<div class="si-body"><div class="si-name"><b>${esc(main)}</b>${tag}</div><div class="sub">${esc(sub)}</div></div>` +
+    `<button class="si-add" title="加入到目前選的一天">＋<span class="si-add-day">${esc(activeDayShort())}</span></button>`;
+  item.querySelector('.si-body').addEventListener('click', () => {
     map.setView([lat, lng], zoom || 14);
     showPreview(lat, lng, main, type);
     searchResults.style.display = 'none';
-    searchInput.value = '';
+  });
+  item.querySelector('.si-add').addEventListener('click', e => {
+    e.stopPropagation();
+    map.setView([lat, lng], zoom || 14);
+    addFromSearch(lat, lng, main, type);
   });
   searchResults.appendChild(item);
 }
@@ -1999,20 +2112,26 @@ function doSearch(q) {
   if (!q) return;
   searchResults.innerHTML = '';
   searchResults.style.display = 'block';
-  // 1) 內建紐西蘭景點字典（中文 OK、即時）
+  // 1) 內建紐西蘭景點字典（中文 OK、即時，永遠置頂）
   const dictHits = searchLocalDict(q);
   dictHits.forEach(p => appendSearchItem(p.n[0], `${p.en}・紐西蘭`, p.lat, p.lng, p.z, true, p.t));
-  // 2) OpenStreetMap 全球搜尋
+  // 2) OpenStreetMap 全球搜尋（帶國家資訊，紐西蘭優先）
   const loading = document.createElement('div');
-  loading.className = 'search-item';
+  loading.className = 'search-item search-loading';
   loading.textContent = '🌐 全球搜尋中…';
   searchResults.appendChild(loading);
-  fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=6&accept-language=zh-TW`)
+  fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=8&accept-language=zh-TW&q=${encodeURIComponent(q)}`)
     .then(r => r.json())
     .then(results => {
       loading.remove();
+      // 紐西蘭結果優先、其餘依原順序（降低非目標國家排序）
+      results.sort((a, b) => ((b.address && b.address.country_code === 'nz') ? 1 : 0) - ((a.address && a.address.country_code === 'nz') ? 1 : 0));
       results.forEach(r => {
-        appendSearchItem(s2t(r.display_name.split(',')[0]), s2t(r.display_name), +r.lat, +r.lon, 14, false);
+        const cc = r.address && r.address.country_code;
+        const country = (r.address && (r.address.country)) || '';
+        const flag = countryFlag(cc);
+        const sub = (country ? country + '・' : '') + s2t(r.display_name);
+        appendSearchItem(s2t(r.display_name.split(',')[0]), sub, +r.lat, +r.lon, 14, false, undefined, flag);
       });
       if (!dictHits.length && !results.length) {
         searchResults.innerHTML = `<div class="search-item">找不到「${esc(q)}」。國外景點試試<b>英文名稱</b>（例：Skyline Queenstown），或直接在地圖上點選位置</div>`;
@@ -2051,6 +2170,33 @@ document.getElementById('quickJump').addEventListener('change', e => {
   }
   const [lat, lng, z] = v.split(',').map(Number);
   map.setView([lat, lng], z);
+});
+
+/* ===== 設定 popover ===== */
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsPanel = document.getElementById('settingsPanel');
+settingsBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  const open = settingsPanel.classList.toggle('open');
+  settingsBtn.classList.toggle('active', open);
+  settingsBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#settingsWrap')) { settingsPanel.classList.remove('open'); settingsBtn.classList.remove('active'); settingsBtn.setAttribute('aria-expanded', 'false'); }
+});
+
+/* ===== 「加入到 Day X」指示器 ===== */
+const dayTarget = document.getElementById('dayTarget');
+function updateDayTarget() {
+  const cur = state.activeDayId;
+  dayTarget.innerHTML = state.days.map((d, i) => {
+    const label = d.name && d.name.length <= 14 ? d.name : `Day ${i + 1}`;
+    return `<option value="${d.id}" ${d.id === cur ? 'selected' : ''}>${esc(label)}</option>`;
+  }).join('');
+}
+dayTarget.addEventListener('change', () => {
+  state.activeDayId = dayTarget.value;
+  saveState(); renderSidebar();
 });
 
 /* ============ 側欄按鈕 ============ */
