@@ -1489,6 +1489,9 @@ async function ensurePoi(stop, day, i, mk) {
   }
 }
 
+/* 長行程（>8 天）時，非選中的日子在地圖上淡化，讓當天路線／站點聚焦、減少 30 天 60 點的擁擠 */
+function dayDim(day) { return state.days.length > 8 && day.id !== state.activeDayId; }
+
 function renderMap() {
   // 記住重繪前開著的彈窗，重建後還原（路線算完的重繪才不會把剛打開的彈窗關掉）
   let openStopId = null;
@@ -1497,6 +1500,7 @@ function renderMap() {
   markersById = {};
   state.days.forEach(day => {
     if (!day.visible) return;
+    const dim = dayDim(day);
     // 標記
     day.stops.forEach((stop, i) => {
       const t = stop.type || '📍';
@@ -1513,7 +1517,7 @@ function renderMap() {
         iconAnchor: [14, 14],
         popupAnchor: [0, -15]
       });
-      const mk = L.marker([stop.lat, stop.lng], { icon, draggable: true }).addTo(overlay);
+      const mk = L.marker([stop.lat, stop.lng], { icon, draggable: true, opacity: dim ? 0.35 : 1, zIndexOffset: dim ? 0 : 400 }).addTo(overlay);
       mk._stopId = stop.id;
       mk.bindPopup(popupHtml(day, stop, i, poiCache[stop.id]));
       mk.on('popupopen', () => { wirePopupNote(mk, stop, day); ensurePoi(stop, day, i, mk); });
@@ -1579,9 +1583,12 @@ function drawRoute(day) {
   const cached = routeCache[day.id];
 
   const straight = day.stops.map(s => [s.lat, s.lng]);
+  const dim = dayDim(day);
+  const solidW = dim ? 2.5 : 4, solidO = dim ? 0.28 : 0.85;   // 長行程時非選中日淡化
+  const dashW = dim ? 2 : 3, dashO = dim ? 0.22 : 0.5;
 
   if (mode === 'straight') {
-    L.polyline(straight, { color: day.color, weight: 4, opacity: .85 }).bindTooltip(day.name, { sticky: true }).addTo(overlay);
+    L.polyline(straight, { color: day.color, weight: solidW, opacity: solidO }).bindTooltip(day.name, { sticky: true }).addTo(overlay);
     let dist = 0;
     for (let i = 1; i < day.stops.length; i++) dist += haversine(day.stops[i-1], day.stops[i]);
     day._info = `直線距離約 ${fmtKm(dist)}`;
@@ -1596,7 +1603,7 @@ function drawRoute(day) {
   parts.filter(p => p.kind === 'flight').forEach(p => {
     L.polyline(
       [[day.stops[p.a].lat, day.stops[p.a].lng], [day.stops[p.b].lat, day.stops[p.b].lng]],
-      { color: day.color, weight: 3, opacity: .65, dashArray: '2 10' }
+      { color: day.color, weight: dashW, opacity: dim ? 0.3 : 0.65, dashArray: '2 10' }
     ).bindTooltip(day.name + '（飛行段）', { sticky: true }).addTo(overlay);
   });
 
@@ -1612,12 +1619,12 @@ function drawRoute(day) {
     let dist = 0, dur = 0, failed = 0;
     cached.parts.forEach((seg, pi) => {
       if (seg) {
-        L.polyline(seg.latlngs, { color: day.color, weight: 4, opacity: .85 }).bindTooltip(day.name, { sticky: true }).addTo(overlay);
+        L.polyline(seg.latlngs, { color: day.color, weight: solidW, opacity: solidO }).bindTooltip(day.name, { sticky: true }).addTo(overlay);
         dist += seg.distance; dur += seg.duration;
       } else {
         // 該段查詢失敗，退回直線虛線
         L.polyline(driveParts[pi].idxs.map(ix => [day.stops[ix].lat, day.stops[ix].lng]),
-          { color: day.color, weight: 3, opacity: .5, dashArray: '6 8' }).bindTooltip(day.name, { sticky: true }).addTo(overlay);
+          { color: day.color, weight: dashW, opacity: dashO, dashArray: '6 8' }).bindTooltip(day.name, { sticky: true }).addTo(overlay);
         failed++;
       }
     });
@@ -1633,7 +1640,7 @@ function drawRoute(day) {
   // 先畫虛線佔位，並對每個開車段發出請求
   driveParts.forEach(p => {
     L.polyline(p.idxs.map(ix => [day.stops[ix].lat, day.stops[ix].lng]),
-      { color: day.color, weight: 3, opacity: .5, dashArray: '6 8' }).bindTooltip(day.name, { sticky: true }).addTo(overlay);
+      { color: day.color, weight: dashW, opacity: dashO, dashArray: '6 8' }).bindTooltip(day.name, { sticky: true }).addTo(overlay);
   });
   day._info = '計算開車路線中…';
   updateDayInfo(day);
@@ -1799,7 +1806,7 @@ function renderSidebar() {
     `;
     header.addEventListener('click', e => {
       if (e.target.closest('.icon-btn') || e.target.classList.contains('day-name') || e.target.classList.contains('day-color-dot')) return;
-      state.activeDayId = day.id; saveState(); renderSidebar();
+      state.activeDayId = day.id; saveState(); renderSidebar(); if (state.days.length > 8) renderMap();
     });
     header.querySelector('.day-color-dot').addEventListener('click', () => {
       const idx = DAY_COLORS.indexOf(day.color);
@@ -1966,7 +1973,7 @@ function renderSidebar() {
         `<button class="day-empty-cta" data-act="addfirst">＋ 加入第一個地點</button>` +
         `<div class="day-empty-sub">搜尋上方景點、餐廳、住宿，或直接點地圖加入</div>`;
       empty.querySelector('[data-act="addfirst"]').addEventListener('click', () => {
-        state.activeDayId = day.id; saveState(); renderSidebar();
+        state.activeDayId = day.id; saveState(); renderSidebar(); if (state.days.length > 8) renderMap();
         if (window.innerWidth <= 760) document.getElementById('sidebar').classList.remove('open');
         const si = document.getElementById('searchInput');
         si.scrollIntoView({ block: 'nearest' }); si.focus();
@@ -2174,8 +2181,13 @@ function searchLocalDict(qRaw) {
     for (const alias of p.n) {
       const a = alias.toLowerCase().replace(/\s+/g, '');
       if (a === q) s = Math.max(s, 1000);                    // 完全相符
-      else if (q.includes(a)) s = Math.max(s, 100 + a.length); // 查詢含別名：別名越長＝越精確（「奧克蘭機場」勝過「奧克蘭」）
-      else if (a.includes(q)) s = Math.max(s, 40 + q.length);  // 別名含查詢（前綴式）
+      else if (q.includes(a)) {
+        // 查詢含別名：只有當「別名佔查詢大部分」才置頂（避免搜「Amano restaurant Auckland」時城市名蓋掉餐廳）
+        const ratio = a.length / q.length;
+        if (ratio >= 0.6) s = Math.max(s, 100 + a.length);
+        // 別名只是附帶（如店名裡剛好含城市）→ 不加分，讓 OSM 店家/景點出頭
+      }
+      else if (a.includes(q)) s = Math.max(s, 40 + q.length);  // 別名含查詢（前綴式，如打「皇后」找皇后鎮）
     }
     if (s) scored.push([s, p]);
   });
@@ -2338,7 +2350,7 @@ function updateDayTarget() {
 }
 dayTarget.addEventListener('change', () => {
   state.activeDayId = dayTarget.value;
-  saveState(); renderSidebar();
+  saveState(); renderSidebar(); if (state.days.length > 8) renderMap();
 });
 
 /* ============ 側欄按鈕 ============ */
