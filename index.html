@@ -2002,9 +2002,12 @@ function renderSidebar() {
   if (meh) meh.classList.toggle('show', totalStops === 0);
   const mbCount = document.getElementById('mbCount');
   if (mbCount) mbCount.textContent = totalStops || '';
-  // 空行程時弱化「分享／共編」（還沒東西可分享），有站點才強調
+  // 空行程時弱化「分享／共編」（還沒東西可分享），有站點才強調＋文案轉為行動導向
   const shareBtn = document.getElementById('shareBtn');
-  if (shareBtn) shareBtn.classList.toggle('primary', totalStops > 0);
+  if (shareBtn) {
+    shareBtn.classList.toggle('primary', totalStops > 0);
+    shareBtn.textContent = totalStops > 0 ? '🔗 分享行程給旅伴' : '🔗 分享／共編';
+  }
   document.body.classList.toggle('trip-empty', totalStops === 0);
 }
 
