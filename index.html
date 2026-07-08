@@ -294,7 +294,17 @@
     font-size: 12px; color: var(--muted); font-family: inherit; resize: none;
     margin-top: 1px; line-height: 1.5;
   }
-  .stop-actions { display: flex; flex-direction: column; gap: 0; flex-shrink: 0; }
+  .stop-actions {
+    display: flex; flex-direction: column; gap: 1px; flex-shrink: 0;
+    align-items: center;
+    /* 靜止時稍微收斂、hover 該站才完全浮現，畫面更乾淨 */
+    opacity: .55;
+    transition: opacity var(--dur) var(--ease);
+  }
+  .stop-item:hover .stop-actions { opacity: 1; }
+  .stop-actions .icon-btn { min-width: 28px; min-height: 28px; border-radius: 8px; }
+  .stop-move-wrap { position: relative; }
+  .stop-move-wrap:hover { background: var(--accent-soft); color: var(--accent); }
   .drag-handle { cursor: grab; color: #cdc6b6; font-size: 13px; margin-top: 4px; flex-shrink: 0; transition: color var(--dur) var(--ease); }
   .drag-handle:hover { color: var(--muted); }
   .stop-name-row { display: flex; align-items: center; gap: 3px; }
@@ -415,7 +425,8 @@
   .touch-only { display: none !important; }
   @media (pointer: coarse) {
     .touch-only { display: inline-flex !important; }
-    .stop-actions { display: grid; grid-template-columns: repeat(2, auto); }
+    /* 觸控裝置沒有 hover，操作圖示恆亮 */
+    .stop-actions { display: grid; grid-template-columns: repeat(2, auto); opacity: 1; }
   }
 
   /* ===== Map ===== */
@@ -551,13 +562,13 @@
   #toolsDisclosure { font-size: 10.5px; color: var(--muted); padding: 0 12px 9px; line-height: 1.5; }
 
   /* 移到其他天的下拉（只顯示 📆 圖示） */
+  /* 移到其他天：SVG 月曆圖示在下、透明 select 疊在上（保留原生下拉與無障礙） */
   .stop-move {
-    border: none; background: transparent;
-    font-size: 13px; cursor: pointer;
-    width: 24px; padding: 2px 0; text-align: center;
-    color: var(--muted);
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    opacity: 0; cursor: pointer;
+    border: none; outline: none; font-family: inherit;
     -webkit-appearance: none; -moz-appearance: none; appearance: none;
-    outline: none; font-family: inherit;
   }
   .day-header.drag-over { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
 
@@ -934,7 +945,10 @@ const ICONS = {
   x: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A11 11 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.1 6.1A17 17 0 0 0 2 12s3.5 7 10 7a10 10 0 0 0 4-.8"/></svg>',
-  pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="12" r="2.5"/></svg>'
+  pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="12" r="2.5"/></svg>',
+  locate: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>',
+  moveDay: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M11 15l2.2 2.2L11 19.4"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V7M18 7l-.9 12.1a2 2 0 0 1-2 1.9H8.9a2 2 0 0 1-2-1.9L6 7M10 11.5v5M14 11.5v5"/></svg>'
 };
 
 /* ============ 公開版設定 ============ */
@@ -1429,12 +1443,15 @@ function renderSidebar() {
         <div class="stop-actions">
           <button class="icon-btn touch-only" data-act="mvup" title="上移" aria-label="這個地點往上移">${ICONS.up}</button>
           <button class="icon-btn touch-only" data-act="mvdown" title="下移" aria-label="這個地點往下移">${ICONS.down}</button>
-          <button class="icon-btn" data-act="focus" title="在地圖上顯示" aria-label="在地圖上顯示這個地點">${ICONS.pin}</button>
-          <select class="stop-move" title="移到其他天" aria-label="把這個地點移到其他天">
-            <option value="">📆</option>
-            ${state.days.filter(d => d.id !== day.id).map(d => `<option value="${d.id}">→ ${esc(d.name)}</option>`).join('')}
-          </select>
-          <button class="icon-btn danger" data-act="del" title="刪除" aria-label="刪除這個地點">${ICONS.x}</button>
+          <button class="icon-btn" data-act="focus" title="在地圖上顯示" aria-label="在地圖上顯示這個地點">${ICONS.locate}</button>
+          <span class="icon-btn stop-move-wrap" title="移到其他天">
+            ${ICONS.moveDay}
+            <select class="stop-move" aria-label="把這個地點移到其他天">
+              <option value="">移到其他天…</option>
+              ${state.days.filter(d => d.id !== day.id).map(d => `<option value="${d.id}">→ ${esc(d.name)}</option>`).join('')}
+            </select>
+          </span>
+          <button class="icon-btn danger" data-act="del" title="移除這個地點" aria-label="移除這個地點">${ICONS.trash}</button>
         </div>
       `;
       li.querySelector('.stop-move').addEventListener('change', e => {
