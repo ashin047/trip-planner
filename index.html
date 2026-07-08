@@ -329,6 +329,7 @@
     color: var(--day-c, var(--accent));
     padding: 1px 8px; border-radius: 10px; font-weight: 700;
   }
+  .day-hidden-tag { margin-left: 6px; color: var(--accent2); font-size: 11px; font-weight: 600; }
   .icon-btn {
     border: none; background: none;
     font-size: 14px; color: var(--muted);
@@ -1774,6 +1775,48 @@ function openStopMenu(btn, day, stop, si) {
   });
 }
 
+/* 天層級「⋯」選單（顯示/隱藏、排序、刪除，收斂工具感） */
+function openDayMenu(btn, day, di) {
+  const rows = [];
+  if (day.stops.length) rows.push(`<button class="sm-item" data-dm="fit">${ICONS.locate}<span>縮放至此日</span></button>`);
+  rows.push(`<button class="sm-item" data-dm="vis">${day.visible ? ICONS.eye : ICONS.eyeOff}<span>${day.visible ? '在地圖上隱藏這天' : '在地圖上顯示這天'}</span></button>`);
+  if (di > 0) rows.push(`<button class="sm-item" data-dm="up"><span class="sm-arrow">↑</span><span>這天往前移</span></button>`);
+  if (di < state.days.length - 1) rows.push(`<button class="sm-item" data-dm="down"><span class="sm-arrow">↓</span><span>這天往後移</span></button>`);
+  rows.push(`<div class="sm-sep"></div>`);
+  rows.push(`<button class="sm-item danger" data-dm="del">${ICONS.trash}<span>刪除這一天</span></button>`);
+  stopMenuEl.innerHTML = rows.join('');
+  stopMenuEl.classList.add('open');
+  const r = btn.getBoundingClientRect();
+  const mw = stopMenuEl.offsetWidth, mh = stopMenuEl.offsetHeight;
+  let left = Math.min(r.right - mw, window.innerWidth - mw - 8);
+  let top = r.bottom + 4;
+  if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
+  stopMenuEl.style.left = Math.max(8, left) + 'px';
+  stopMenuEl.style.top = top + 'px';
+  stopMenuEl.querySelectorAll('.sm-item').forEach(item => {
+    item.addEventListener('click', e => {
+      e.stopPropagation();
+      const act = item.dataset.dm;
+      closeStopMenu();
+      if (act === 'fit') {
+        map.fitBounds(L.latLngBounds(day.stops.map(s => [s.lat, s.lng])), { padding: [50, 50] });
+        if (window.innerWidth <= 760) document.getElementById('sidebar').classList.remove('open');
+      } else if (act === 'vis') { day.visible = !day.visible; saveState(); renderAll(); }
+      else if (act === 'up') { if (di > 0) { pushUndo(); state.days.splice(di, 1); state.days.splice(di - 1, 0, day); saveState(); renderAll(); } }
+      else if (act === 'down') { if (di < state.days.length - 1) { pushUndo(); state.days.splice(di, 1); state.days.splice(di + 1, 0, day); saveState(); renderAll(); } }
+      else if (act === 'del') {
+        if (day.stops.length && !confirm(`確定刪除「${day.name}」？裡面有 ${day.stops.length} 個地點。`)) return;
+        pushUndo();
+        state.days = state.days.filter(d => d.id !== day.id);
+        if (state.activeDayId === day.id) state.activeDayId = state.days[0] ? state.days[0].id : null;
+        delete routeCache[day.id];
+        collapsedDays.delete(day.id);
+        saveState(); renderAll();
+      }
+    });
+  });
+}
+
 /* ============ 渲染：側邊欄 ============ */
 function renderSidebar() {
   const list = document.getElementById('dayList');
@@ -1795,12 +1838,9 @@ function renderSidebar() {
         <button class="icon-btn day-collapse" data-act="collapse" title="${collapsed ? '展開' : '收合'}" aria-label="${collapsed ? '展開這一天' : '收合這一天'}">${collapsed ? ICONS.down : ICONS.up}</button>
       </div>
       <div class="day-sub-row">
-        <span class="day-meta">${dayDateLabel(di)}<span class="meta-count">${day.stops.length} 站</span></span>
+        <span class="day-meta">${dayDateLabel(di)}<span class="meta-count">${day.stops.length} 站</span>${day.visible ? '' : '<span class="day-hidden-tag">已隱藏</span>'}</span>
         <span class="day-btns">
-          <button class="icon-btn" data-act="vis" title="${day.visible ? '隱藏這一天' : '顯示這一天'}" aria-label="${day.visible ? '隱藏這一天' : '顯示這一天'}">${day.visible ? ICONS.eye : ICONS.eyeOff}</button>
-          <button class="icon-btn" data-act="up" title="上移" aria-label="這一天往前移">${ICONS.up}</button>
-          <button class="icon-btn" data-act="down" title="下移" aria-label="這一天往後移">${ICONS.down}</button>
-          <button class="icon-btn danger" data-act="del" title="刪除這一天" aria-label="刪除這一天">${ICONS.trash}</button>
+          <button class="icon-btn" data-act="daymenu" title="這一天的操作" aria-label="這一天的操作（顯示、排序、刪除）">${ICONS.dots}</button>
         </span>
       </div>
     `;
@@ -1837,21 +1877,9 @@ function renderSidebar() {
         toast(`已把「${moved.name}」移到 ${day.name}`);
       } catch (err) {}
     });
-    header.querySelector('[data-act="vis"]').addEventListener('click', () => { day.visible = !day.visible; saveState(); renderAll(); });
-    header.querySelector('[data-act="up"]').addEventListener('click', () => {
-      if (di > 0) { pushUndo(); state.days.splice(di, 1); state.days.splice(di - 1, 0, day); saveState(); renderAll(); }
-    });
-    header.querySelector('[data-act="down"]').addEventListener('click', () => {
-      if (di < state.days.length - 1) { pushUndo(); state.days.splice(di, 1); state.days.splice(di + 1, 0, day); saveState(); renderAll(); }
-    });
-    header.querySelector('[data-act="del"]').addEventListener('click', () => {
-      if (day.stops.length && !confirm(`確定刪除「${day.name}」？裡面有 ${day.stops.length} 個地點。`)) return;
-      pushUndo();
-      state.days = state.days.filter(d => d.id !== day.id);
-      if (state.activeDayId === day.id) state.activeDayId = state.days[0] ? state.days[0].id : null;
-      delete routeCache[day.id];
-      collapsedDays.delete(day.id);
-      saveState(); renderAll();
+    header.querySelector('[data-act="daymenu"]').addEventListener('click', e => {
+      e.stopPropagation();
+      openDayMenu(e.currentTarget, day, di);
     });
     header.querySelector('[data-act="collapse"]').addEventListener('click', () => toggleDayCollapse(day.id));
     card.appendChild(header);
