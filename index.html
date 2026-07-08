@@ -762,7 +762,7 @@
   .day-header.drag-over { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
 
   /* ===== 存檔管理 Modal ===== */
-  #saveModal, #shareModal {
+  #saveModal, #shareModal, #bookingModal {
     display: none;
     position: fixed;
     inset: 0;
@@ -773,7 +773,34 @@
     align-items: center;
     justify-content: center;
   }
-  #saveModal.open, #shareModal.open { display: flex; }
+  #saveModal.open, #shareModal.open, #bookingModal.open { display: flex; }
+  /* 一鍵預訂清單 */
+  .booking-sec { margin-bottom: 16px; }
+  .booking-sec:last-child { margin-bottom: 4px; }
+  .booking-sec h4 { font-size: 13.5px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .booking-sec h4 .bs-count { font-size: 11px; font-weight: 600; color: var(--muted); }
+  .booking-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 11px; margin-bottom: 6px;
+    border: 1px solid var(--border); border-radius: 11px;
+    background: var(--panel);
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  }
+  .booking-row:hover { border-color: var(--accent2); box-shadow: 0 2px 8px rgba(189,112,72,.12); }
+  .booking-row .br-body { flex: 1; min-width: 0; }
+  .booking-row .br-title { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .booking-row .br-sub { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+  .booking-row .br-cta {
+    flex-shrink: 0; text-decoration: none;
+    background: var(--accent2); color: #fff;
+    font-size: 12.5px; font-weight: 700;
+    padding: 7px 14px; border-radius: 18px;
+    white-space: nowrap;
+    transition: background var(--dur) var(--ease);
+  }
+  .booking-row .br-cta:hover { background: #a05e3a; }
+  .booking-foot { padding: 10px 18px 16px; font-size: 11px; color: var(--muted); line-height: 1.6; }
+  .booking-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 20px 0; }
   .share-section { padding: 4px 0 14px; }
   .share-section + .share-section { border-top: 1px solid var(--border); padding-top: 14px; }
   .share-section h3 { font-size: 14.5px; margin-bottom: 4px; }
@@ -1093,6 +1120,7 @@
       </div>
     </div>
     <div id="sidebarFooter">
+      <button class="btn" id="bookingListBtn">🧳 一鍵預訂清單</button>
       <button class="btn primary" id="shareBtn">🔗 分享／共編</button>
       <button class="btn" id="saveManagerBtn">🗂️ 行程版本</button>
       <button class="btn" id="copyTextBtn">📋 複製文字行程</button>
@@ -1123,6 +1151,17 @@
 
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="stopMenu" role="menu" aria-label="地點操作"></div>
+
+<div id="bookingModal" role="dialog" aria-modal="true" aria-label="一鍵預訂清單">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="title">🧳 準備出發？照你的行程預訂</span>
+      <button class="icon-btn" id="bookingModalClose" title="關閉" aria-label="關閉" style="font-size:18px">✕</button>
+    </div>
+    <div class="modal-body" id="bookingBody"></div>
+    <div class="booking-foot">透過連結預訂，你的價格不變，我們會獲得少量回饋支持工具維護 🙏（皆為聯盟連結）</div>
+  </div>
+</div>
 
 <div id="shareModal" role="dialog" aria-modal="true" aria-label="分享與共同編輯">
   <div class="modal-box">
@@ -2634,6 +2673,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeSaveModal();
     document.getElementById('shareModal').classList.remove('open');
+    document.getElementById('bookingModal').classList.remove('open');
     document.getElementById('sidebar').classList.remove('open');
     if (document.getElementById('welcomeModal').classList.contains('open')) closeWelcome();
   }
@@ -2885,6 +2925,81 @@ function updateSyncUI() {
     document.getElementById('syncDesc').innerHTML = '和旅伴一起編輯<b>同一份</b>行程，改動自動同步。<b>雲端同步服務開通中</b>——目前請先用上面的唯讀分享。';
   }
 }
+
+/* ===== 一鍵預訂清單（Tier 2：抓行程排完的黃金購買時機） ===== */
+function buildBookingList() {
+  const days = state.days;
+  const secs = [];
+  // 機票
+  secs.push({ title: '✈️ 機票', count: '', rows: [
+    { title: '搜尋台灣↔紐西蘭便宜機票', sub: 'Skyscanner 比價各家航空', aff: 'skyscanner', href: 'https://skyscanner.pxf.io/vNdPBd', cta: '比機票' }
+  ]});
+  // 住宿（每天過夜處，連續同地自動併成多晚；跳過機場）
+  const stays = [];
+  const cleanPlace = n => (n || '').replace(/[（(].*$/, '').trim() || n;   // 去掉「（續住）」等註記，同飯店才能併晚
+  days.forEach((d, di) => {
+    if (!d.stops.length) return;
+    const stayStop = d.stops.find(s => s.type === '🛏️') || d.stops[d.stops.length - 1];
+    const place = cleanPlace(stayStop.name);
+    if (/機場|airport/i.test(place)) return;   // 不會住機場
+    const prev = stays[stays.length - 1];
+    if (prev && prev.place === place && prev.endDi === di - 1) { prev.endDi = di; prev.nights++; }
+    else stays.push({ place, startDi: di, endDi: di, nights: 1 });
+  });
+  if (stays.length) {
+    secs.push({ title: '🛏️ 住宿', count: `${stays.length} 段`, rows: stays.map(st => {
+      const ci = dayISO(st.startDi), co = dayISO(st.startDi, st.nights);
+      const dates = (ci && co) ? `&checkin=${ci}&checkout=${co}&group_adults=2&no_rooms=1` : '';
+      return {
+        title: st.place,
+        sub: (mdLabel(st.startDi) ? `${mdLabel(st.startDi)} 入住・` : '') + `${st.nights} 晚`,
+        aff: 'booking',
+        href: `https://www.booking.com/searchresults.zh-tw.html?ss=${encodeURIComponent(st.place)}${dates}&aid=1321287&label=shin-planner-stay-list`,
+        cta: '訂房'
+      };
+    })});
+  }
+  // 租車（多天行程多半要自駕）
+  if (days.length >= 2) {
+    secs.push({ title: '🚗 租車', count: '', rows: [
+      { title: '紐西蘭自駕・機場取還車', sub: 'Airport Rentals（支援繁中）', aff: 'airportrentals', href: 'https://www.airportrentals.com/zh?affiliate=shin', cta: '找租車' }
+    ]});
+  }
+  // eSIM
+  secs.push({ title: '📶 上網 eSIM', count: '', rows: [
+    { title: '落地就有網路，免換卡', sub: '阿新專屬 eSIM 方案', aff: 'esim', href: 'https://ashin.esimart.cc', cta: '看方案' }
+  ]});
+  // 活動票券（你排的 🎯 活動）
+  const acts = [], seen = new Set();
+  days.forEach(d => d.stops.forEach(s => { if (s.type === '🎯' && !seen.has(s.name)) { seen.add(s.name); acts.push(s.name); } }));
+  if (acts.length) {
+    secs.push({ title: '🎯 活動票券', count: `${acts.length} 項`, rows: acts.slice(0, 15).map(name => ({
+      title: name, sub: '找票券／體驗', aff: 'kkday',
+      href: `https://www.kkday.com/zh-tw/search?keyword=${encodeURIComponent(name)}&cid=19977`, cta: '找票券'
+    }))});
+  }
+  return secs;
+}
+function openBookingList() {
+  const body = document.getElementById('bookingBody');
+  if (!state.days.some(d => d.stops.length)) {
+    body.innerHTML = '<div class="booking-empty">還沒排行程～先加幾個地點，這裡就會照你的行程生出機票、住宿、租車的預訂清單。</div>';
+  } else {
+    const secs = buildBookingList();
+    body.innerHTML = secs.map(sec =>
+      `<div class="booking-sec"><h4>${sec.title}${sec.count ? `<span class="bs-count">${sec.count}</span>` : ''}</h4>` +
+      sec.rows.map(r =>
+        `<div class="booking-row"><div class="br-body"><div class="br-title">${esc(r.title)}</div><div class="br-sub">${esc(r.sub)}</div></div>` +
+        `<a class="br-cta" data-aff="${r.aff}" href="${r.href}" target="_blank" rel="sponsored nofollow noopener">${r.cta} →</a></div>`
+      ).join('') + `</div>`
+    ).join('');
+  }
+  document.getElementById('bookingModal').classList.add('open');
+  track('booking_list_open');
+}
+document.getElementById('bookingListBtn').addEventListener('click', openBookingList);
+document.getElementById('bookingModalClose').addEventListener('click', () => document.getElementById('bookingModal').classList.remove('open'));
+document.getElementById('bookingModal').addEventListener('click', e => { if (e.target.id === 'bookingModal') e.currentTarget.classList.remove('open'); });
 
 document.getElementById('shareBtn').addEventListener('click', () => {
   updateSyncUI();
