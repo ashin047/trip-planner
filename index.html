@@ -91,16 +91,28 @@
     box-shadow: 0 2px 6px rgba(71,105,92,.35);
   }
   #topbar h1 .logo svg { width: 18px; height: 18px; stroke: #fff; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-  #searchWrap { position: relative; flex: 1; min-width: 220px; max-width: 420px; }
+  #searchWrap { position: relative; flex: 1; min-width: 220px; max-width: 440px; }
+  #searchWrap::before {
+    content: '';
+    position: absolute; left: 13px; top: 50%; width: 15px; height: 15px;
+    transform: translateY(-50%);
+    background: no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2347695c' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4-4'/%3E%3C/svg%3E");
+    opacity: .7; pointer-events: none;
+  }
   #searchInput {
     width: 100%;
-    padding: 8px 12px;
-    border: 1px solid var(--border);
-    border-radius: 20px;
+    padding: 9px 12px 9px 36px;
+    border: 1.5px solid var(--border);
+    border-radius: 22px;
     font-size: 14px;
     outline: none;
+    background: var(--panel);
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
   }
-  #searchInput:focus { border-color: var(--accent); }
+  #searchInput:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); }
+  /* 頂欄次要控制項在第一屏視覺弱化，把注意力留給搜尋 */
+  #topbar > select.btn { color: var(--muted); border-color: var(--border); }
+  #topbar > select.btn:hover { color: var(--text); }
   #searchResults {
     position: absolute;
     top: 42px; left: 0; right: 0;
@@ -512,7 +524,26 @@
     text-shadow: 0 1px 0 rgba(255,255,255,.7);
   }
   #mapEmptyHint.show { display: flex; }
-  #mapEmptyHint .ico { font-size: 30px; opacity: .55; }
+  #mapEmptyHint .ico { font-size: 34px; opacity: .5; }
+  #mapEmptyHint .eh-main { font-size: 17px; letter-spacing: 2px; }
+  #mapEmptyHint .eh-sub {
+    font-family: "Noto Sans TC", sans-serif;
+    font-size: 12.5px; letter-spacing: .5px; color: #a89f8d;
+    margin-top: -2px;
+  }
+  #mapEmptyHint .eh-demo {
+    pointer-events: auto;
+    margin-top: 6px;
+    font-family: "Noto Sans TC", sans-serif;
+    font-size: 13px; letter-spacing: .5px;
+    color: var(--accent); font-weight: 600;
+    background: var(--panel);
+    border: 1px solid var(--accent); border-radius: 20px;
+    padding: 7px 18px; cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+  #mapEmptyHint .eh-demo:hover { background: var(--accent); color: #fff; }
   @media (max-width: 760px) { #mapEmptyHint { left: 0; } }
 
   /* Leaflet 彈窗與 tooltip 換成紙感圓角 */
@@ -705,44 +736,81 @@
   .save-item .mini-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
   .save-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 0; }
 
-  /* ===== 新手導覽 ===== */
+  /* ===== 新手入門（輕量、聚焦、先問目的） ===== */
   #welcomeModal {
     display: none; position: fixed; inset: 0;
-    background: rgba(23,28,40,.55);
-    backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+    background: rgba(40,36,28,.28);
+    backdrop-filter: blur(1.5px); -webkit-backdrop-filter: blur(1.5px);
     z-index: 3500; align-items: center; justify-content: center; padding: 16px;
+    animation: welcomeFade var(--dur) var(--ease);
   }
+  @keyframes welcomeFade { from { opacity: 0; } to { opacity: 1; } }
   #welcomeModal.open { display: flex; }
   .welcome-box {
-    background: var(--panel); border-radius: 18px;
+    background: var(--panel); border-radius: 20px;
     box-shadow: var(--shadow-lg);
-    width: min(460px, 94vw); max-height: 88vh; overflow-y: auto;
+    width: min(430px, 94vw); max-height: 90vh; overflow-y: auto;
+    overflow-x: hidden;
+    animation: welcomePop 260ms var(--ease);
   }
+  @keyframes welcomePop { from { transform: translateY(12px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
   .welcome-hero {
-    background: linear-gradient(135deg, #47695c 0%, #8fa377 100%);
-    padding: 26px 24px 20px; color: #fff;
-    border-radius: 18px 18px 0 0;
+    text-align: center;
+    padding: 30px 26px 20px;
   }
-  .welcome-hero h2 { font-size: 20px; font-weight: 900; letter-spacing: 1.5px; font-family: var(--serif); }
-  .welcome-hero p { font-size: 13px; opacity: .92; margin-top: 5px; }
-  .welcome-steps { padding: 20px 22px 6px; }
-  .welcome-step { display: flex; gap: 12px; margin-bottom: 15px; align-items: flex-start; }
+  .welcome-logo {
+    width: 52px; height: 52px; margin: 0 auto 12px;
+    border-radius: 15px;
+    background: linear-gradient(135deg, #47695c 0%, #bd7048 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+    box-shadow: 0 4px 12px rgba(71,105,92,.35);
+  }
+  .welcome-hero h2 { font-size: 21px; font-weight: 900; letter-spacing: 1px; font-family: var(--serif); color: var(--text); }
+  .welcome-focus { font-size: 14px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .welcome-chips { display: flex; gap: 7px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+  .welcome-chips span {
+    font-size: 12px; font-weight: 600; color: var(--accent);
+    background: var(--accent-soft);
+    padding: 4px 11px; border-radius: 20px;
+  }
+  .welcome-paths { display: flex; flex-direction: column; gap: 10px; padding: 6px 22px 8px; }
+  .welcome-path {
+    display: flex; align-items: center; gap: 13px;
+    padding: 13px 15px; text-align: left;
+    border: 1.5px solid var(--border); border-radius: 14px;
+    background: var(--panel); cursor: pointer;
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform 80ms var(--ease);
+    font-family: inherit;
+  }
+  .welcome-path:hover { border-color: var(--accent); box-shadow: 0 3px 12px rgba(71,105,92,.14); }
+  .welcome-path:active { transform: scale(.99); }
+  .welcome-path.primary { border-color: var(--accent); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 7%, transparent), transparent); }
+  .welcome-path .wp-emoji {
+    width: 40px; height: 40px; flex-shrink: 0; border-radius: 11px;
+    background: var(--accent-soft);
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+  }
+  .welcome-path .wp-txt { display: flex; flex-direction: column; }
+  .welcome-path .wp-txt b { font-size: 14.5px; color: var(--text); }
+  .welcome-path .wp-txt small { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .welcome-how {
+    display: block; width: calc(100% - 44px); margin: 4px 22px 6px;
+    background: none; border: none; cursor: pointer;
+    font-size: 12.5px; color: var(--muted); font-family: inherit;
+    padding: 6px; text-align: center;
+  }
+  .welcome-how:hover { color: var(--accent); }
+  .welcome-steps { padding: 4px 22px 20px; }
+  .welcome-step { display: flex; gap: 11px; margin-bottom: 13px; align-items: flex-start; }
   .welcome-step .n {
-    width: 27px; height: 27px; border-radius: 50%;
+    width: 25px; height: 25px; border-radius: 50%;
     background: var(--accent-soft); color: var(--accent);
-    font-weight: 700; font-size: 13px;
+    font-weight: 700; font-size: 12.5px;
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
-  .welcome-step b { font-size: 14px; }
-  .welcome-step p { font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.55; }
-  .welcome-step.welcome-note {
-    background: var(--accent-soft);
-    border-radius: 12px;
-    padding: 10px 12px;
-    margin: 4px 0 12px;
-  }
-  .welcome-actions { display: flex; gap: 10px; padding: 8px 22px 22px; }
-  .welcome-actions .btn { flex: 1; min-height: 42px; font-size: 14px; }
+  .welcome-step b { font-size: 13.5px; }
+  .welcome-step p { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.55; }
 
   /* 手機側欄背景遮罩 */
   #sidebarBackdrop {
@@ -875,7 +943,12 @@
   <div id="sidebarBackdrop" aria-hidden="true"></div>
   <div id="map"></div>
   <div id="hint">點一下地圖，就會把地點加進目前選中的那一天</div>
-  <div id="mapEmptyHint" aria-hidden="true"><span class="ico">🧭</span>搜尋地點，或點地圖任一處開始</div>
+  <div id="mapEmptyHint" aria-hidden="true">
+    <span class="ico">🧭</span>
+    <span class="eh-main">搜尋地點，或點地圖加入第一站</span>
+    <span class="eh-sub">免費・免註冊・變動自動儲存</span>
+    <button class="eh-demo" id="ehDemoBtn">🎬 先載入範例看看</button>
+  </div>
 </div>
 
 <div id="toast" role="status" aria-live="polite"></div>
@@ -910,21 +983,29 @@
   </div>
 </div>
 
-<div id="welcomeModal" role="dialog" aria-modal="true" aria-label="新手導覽">
+<div id="welcomeModal" role="dialog" aria-modal="true" aria-label="開始使用">
   <div class="welcome-box">
     <div class="welcome-hero">
-      <h2>🗺️ 三步驟，排好你的旅行</h2>
-      <p>免費、免註冊，排好的行程會自動存在你的瀏覽器裡</p>
+      <div class="welcome-logo" aria-hidden="true">🗺️</div>
+      <h2>排一趟屬於你的旅行</h2>
+      <p class="welcome-focus">搜尋地點，或直接點地圖，加入你的第一站</p>
+      <div class="welcome-chips"><span>✓ 免費</span><span>✓ 免註冊</span><span>✓ 自動儲存</span></div>
     </div>
-    <div class="welcome-steps">
-      <div class="welcome-step"><span class="n">1</span><div><b>加地點</b><p>上方搜尋地名，或直接點地圖上任何位置</p></div></div>
-      <div class="welcome-step"><span class="n">2</span><div><b>分天規劃</b><p>「＋新增一天」建立 Day 2、Day 3⋯每天一種顏色。地點可以拖曳排序，也能用 📆 搬到別天</p></div></div>
-      <div class="welcome-step"><span class="n">3</span><div><b>看路線、帶著走</b><p>自動算出每段開車距離與時間，一鍵丟回 Google Maps 導航，或複製文字版行程貼給旅伴</p></div></div>
-      <div class="welcome-step welcome-note"><span class="n">💾</span><div><b>不用怕不見</b><p>所有變動即時自動儲存；誤刪按 Ctrl+Z 或復原鍵就能救回</p></div></div>
+    <div class="welcome-paths">
+      <button class="welcome-path" id="welcomeDemoBtn">
+        <span class="wp-emoji" aria-hidden="true">🎬</span>
+        <span class="wp-txt"><b>先載入範例看看</b><small>皇后鎮 3 天小旅行，30 秒就懂怎麼用</small></span>
+      </button>
+      <button class="welcome-path primary" id="welcomeStartBtn">
+        <span class="wp-emoji" aria-hidden="true">✏️</span>
+        <span class="wp-txt"><b>開始加入第一個地點</b><small>空白行程，馬上搜尋你想去的地方</small></span>
+      </button>
     </div>
-    <div class="welcome-actions">
-      <button class="btn" id="welcomeDemoBtn">🎬 載入範例行程</button>
-      <button class="btn primary" id="welcomeStartBtn">開始規劃 →</button>
+    <button class="welcome-how" id="welcomeHowBtn" aria-expanded="false">還想了解更多功能？ ▾</button>
+    <div class="welcome-steps" id="welcomeSteps" style="display:none">
+      <div class="welcome-step"><span class="n">1</span><div><b>加地點、分天排</b><p>搜尋或點地圖加景點；「＋新增一天」建立 Day 2、Day 3，每天一種顏色，地點可拖曳排序或搬到別天</p></div></div>
+      <div class="welcome-step"><span class="n">2</span><div><b>自動算路線車程</b><p>每段開車距離與時間自動算好，一鍵丟回 Google Maps 導航</p></div></div>
+      <div class="welcome-step"><span class="n">3</span><div><b>分享與共同編輯</b><p>複製文字行程、或產生連結跟旅伴一起編。誤刪按復原鍵就能救回</p></div></div>
     </div>
   </div>
 </div>
@@ -2578,16 +2659,31 @@ function startHintTimer() {
   hintTimerStarted = true;
   setTimeout(() => { const h = document.getElementById('hint'); if (h) h.style.opacity = '0'; }, 8000);
 }
-document.getElementById('welcomeStartBtn').addEventListener('click', closeWelcome);
+document.getElementById('welcomeStartBtn').addEventListener('click', () => {
+  closeWelcome();
+  // 「開始加入第一個地點」→ 直接把游標放到搜尋框，明確下一步
+  const si = document.getElementById('searchInput');
+  if (si && window.innerWidth > 760) si.focus();
+  track('welcome_start_blank');
+});
 document.getElementById('helpBtn').addEventListener('click', openWelcome);
+document.getElementById('welcomeHowBtn').addEventListener('click', () => {
+  const steps = document.getElementById('welcomeSteps');
+  const btn = document.getElementById('welcomeHowBtn');
+  const open = steps.style.display === 'none';
+  steps.style.display = open ? 'block' : 'none';
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  btn.textContent = open ? '收起說明 ▴' : '還想了解更多功能？ ▾';
+});
 document.getElementById('welcomeModal').addEventListener('click', e => {
   if (e.target.id === 'welcomeModal') closeWelcome();
 });
-document.getElementById('welcomeDemoBtn').addEventListener('click', () => {
+function loadDemoTrip() {
   const hasData = state.days.some(d => d.stops.length);
   if (hasData && !confirm('載入範例會取代目前畫面上的行程（可按 Ctrl+Z 復原）。繼續嗎？')) return;
   pushUndo();
   state = JSON.parse(JSON.stringify(DEMO_TRIP));
+  migrateColors(state.days);
   Object.keys(routeCache).forEach(k => delete routeCache[k]);
   document.getElementById('startDate').value = '';
   saveState(); renderAll();
@@ -2595,7 +2691,9 @@ document.getElementById('welcomeDemoBtn').addEventListener('click', () => {
   closeWelcome();
   track('demo_loaded');
   toast('已載入範例：皇后鎮 3 天小旅行，隨意玩玩看！');
-});
+}
+document.getElementById('welcomeDemoBtn').addEventListener('click', loadDemoTrip);
+document.getElementById('ehDemoBtn').addEventListener('click', loadDemoTrip);
 
 /* ============ 啟動 ============ */
 if (state.startDate) startDateInput.value = state.startDate;
