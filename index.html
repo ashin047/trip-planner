@@ -66,6 +66,21 @@
   #dayList::-webkit-scrollbar-track, .modal-body::-webkit-scrollbar-track { background: transparent; }
   #dayList { scrollbar-width: thin; scrollbar-color: #d8cfbd transparent; }
 
+  /* 信任列（免費/免註冊/自動儲存）——只在空行程時出現，加了地點後隱藏讓位給地圖 */
+  #trustStrip {
+    display: none;
+    align-items: center; justify-content: center; gap: 14px;
+    padding: 6px 14px;
+    background: var(--accent-soft);
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
+    font-size: 12px; color: var(--accent-strong);
+    flex-wrap: wrap;
+  }
+  body.trip-empty #trustStrip { display: flex; }
+  #trustStrip span { font-weight: 600; }
+  #trustStrip .ts-tail { color: var(--accent); opacity: .8; font-weight: 500; }
+  @media (max-width: 760px) { #trustStrip .ts-tail { display: none; } #trustStrip { gap: 10px; font-size: 11.5px; } }
+
   /* ===== Topbar ===== */
   #topbar {
     display: flex;
@@ -815,12 +830,12 @@
   .save-item .mini-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
   .save-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 0; }
 
-  /* ===== 新手入門（輕量、聚焦、先問目的） ===== */
+  /* ===== 新手入門（產品引導感：桌面右側非阻擋卡、不重度模糊） ===== */
   #welcomeModal {
     display: none; position: fixed; inset: 0;
-    background: rgba(40,36,28,.28);
-    backdrop-filter: blur(1.5px); -webkit-backdrop-filter: blur(1.5px);
-    z-index: 3500; align-items: center; justify-content: center; padding: 16px;
+    background: rgba(40,36,28,.14);
+    z-index: 3500; align-items: center; justify-content: flex-end;
+    padding: 20px; padding-right: 24px;
     animation: welcomeFade var(--dur) var(--ease);
   }
   @keyframes welcomeFade { from { opacity: 0; } to { opacity: 1; } }
@@ -828,11 +843,17 @@
   .welcome-box {
     background: var(--panel); border-radius: 20px;
     box-shadow: var(--shadow-lg);
-    width: min(430px, 94vw); max-height: 90vh; overflow-y: auto;
+    width: min(400px, 94vw); max-height: 90vh; overflow-y: auto;
     overflow-x: hidden;
     animation: welcomePop 260ms var(--ease);
   }
-  @keyframes welcomePop { from { transform: translateY(12px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes welcomePop { from { transform: translateX(16px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+  @media (max-width: 760px) {
+    /* 手機：底部 sheet */
+    #welcomeModal { align-items: flex-end; justify-content: center; padding: 0; background: rgba(40,36,28,.3); }
+    .welcome-box { width: 100%; max-width: 520px; border-radius: 20px 20px 0 0; animation: welcomeSheet 280ms var(--ease); }
+    @keyframes welcomeSheet { from { transform: translateY(100%); } to { transform: none; } }
+  }
   .welcome-hero {
     text-align: center;
     padding: 30px 26px 20px;
@@ -1012,6 +1033,7 @@
   </div>
   <button class="btn icon-only" id="helpBtn" title="使用說明" aria-label="使用說明"><span class="help-q">?</span></button>
 </div>
+<div id="trustStrip"><span>✓ 免費</span><span>✓ 免註冊</span><span>✓ 自動儲存在你的瀏覽器</span><span class="ts-tail">・適合排一趟紐西蘭自由行</span></div>
 
 <div id="main">
   <div id="sidebar">
@@ -1957,6 +1979,10 @@ function renderSidebar() {
   if (meh) meh.classList.toggle('show', totalStops === 0);
   const mbCount = document.getElementById('mbCount');
   if (mbCount) mbCount.textContent = totalStops || '';
+  // 空行程時弱化「分享／共編」（還沒東西可分享），有站點才強調
+  const shareBtn = document.getElementById('shareBtn');
+  if (shareBtn) shareBtn.classList.toggle('primary', totalStops > 0);
+  document.body.classList.toggle('trip-empty', totalStops === 0);
 }
 
 function renderAll() { renderSidebar(); renderMap(); }
