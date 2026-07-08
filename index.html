@@ -420,13 +420,21 @@
   #clearBtn { color: var(--danger); }
   #clearBtn:hover { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
   .popup-actions a { text-decoration: none; font-size: 12.5px; }
-  .popup-note {
-    display: inline-block; margin-top: 2px;
-    color: #7a8194; cursor: pointer;
-    border-bottom: 1px dashed transparent;
+  .popup-note-input {
+    display: block; width: 100%; margin: 3px 0 1px;
+    box-sizing: border-box;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    padding: 5px 8px;
+    font-family: "Noto Sans TC", "Segoe UI", sans-serif;
+    font-size: 12.5px; line-height: 1.5; color: #6a6355;
+    resize: none; outline: none; overflow: hidden;
+    transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
   }
-  .popup-note:hover { border-bottom-color: #c3bba9; }
-  .popup-addnote { text-decoration: none; font-size: 12.5px; color: var(--accent); }
+  .popup-note-input::placeholder { color: #a89f8d; }
+  .popup-note-input:hover { border-color: var(--border); }
+  .popup-note-input:focus { border-color: var(--accent); background: #fffdf7; color: var(--text); }
   .help-q {
     display: inline-flex; width: 18px; height: 18px; border-radius: 50%;
     border: 2px solid var(--accent); color: var(--accent);
@@ -1134,24 +1142,51 @@ function popupHtml(day, stop, i, poi) {
     if (poi.web) rows.push(`🌐 <a href="${esc(poi.web)}" target="_blank" rel="noopener">官方網站</a>`);
     poiHtml = `<br><span style="font-size:12px;line-height:1.7">${rows.join('<br>')}</span>`;
   }
-  const noteHtml = stop.note
-    ? `<br><span class="popup-note" onclick="return __stopAction('note','${day.id}','${stop.id}')" title="點擊編輯備註">📝 ${esc(stop.note)}</span>`
-    : `<br><a href="#" class="popup-addnote" onclick="return __stopAction('note','${day.id}','${stop.id}')">＋ 加備註</a>`;
+  // 內嵌可直接編輯的備註（不跳視窗），data-note 讓 popupopen 綁定事件
+  const noteHtml = `<br><textarea class="popup-note-input" data-note="${day.id}|${stop.id}" rows="1" placeholder="📝 加備註（時間、票價、訂位號…）">${esc(stop.note || '')}</textarea>`;
   return `<b>${esc(day.name)}・第 ${i + 1} 站</b><br>${stop.type || '📍'} ${esc(stop.name)}` +
     noteHtml +
     poiHtml +
     `<br><span class="popup-actions">` +
     `<a href="#" onclick="return __stopAction('rename','${day.id}','${stop.id}')">✏️ 改名</a>　` +
-    `<a href="#" onclick="return __stopAction('note','${day.id}','${stop.id}')">📝 備註</a>　` +
     `<a href="#" onclick="return __stopAction('delete','${day.id}','${stop.id}')" style="color:#b8483d">🗑️ 移除</a>` +
     `</span>` +
     `<br><a href="https://www.google.com/maps/search/?api=1&query=${stop.lat},${stop.lng}" target="_blank">在 Google Maps 開啟</a>` +
     affLink;
 }
+/* 目前正在編輯備註的站點 id（明確旗標，避免 setContent 洗掉輸入中的備註） */
+let editingNoteStopId = null;
+
+/* 綁定彈窗內備註輸入框：直接打字、失焦存檔、與名片雙向同步（不跳視窗、不打斷輸入） */
+function wirePopupNote(mk, stop, day) {
+  const el = mk.getPopup().getElement();
+  if (!el) return;
+  const ta = el.querySelector('.popup-note-input');
+  if (!ta || ta.dataset.wired) return;
+  ta.dataset.wired = '1';
+  const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'; };
+  grow();
+  ta.addEventListener('focus', () => { editingNoteStopId = stop.id; });
+  ta.addEventListener('input', () => { editingNoteStopId = stop.id; stop.note = ta.value; grow(); saveState(); });  // saveState 不重繪，打字順暢
+  ta.addEventListener('blur', () => {
+    if (editingNoteStopId === stop.id) editingNoteStopId = null;
+    stop.note = ta.value.trim();
+    saveState();
+    renderSidebar();   // 同步名片（不動地圖，不打斷已開的彈窗）
+  });
+  // 點 textarea 不要觸發地圖拖曳
+  ta.addEventListener('mousedown', e => e.stopPropagation());
+}
+
+/* 該彈窗是否正在編輯備註（POI 查詢完成時據此跳過 setContent） */
+function popupIsEditing(mk) {
+  return editingNoteStopId && mk._stopId === editingNoteStopId;
+}
+
 async function ensurePoi(stop, day, i, mk) {
   if (poiCache[stop.id] !== undefined) return;
   poiCache[stop.id] = null;
-  mk.getPopup().setContent(popupHtml(day, stop, i, null));
+  if (!popupIsEditing(mk)) { mk.getPopup().setContent(popupHtml(day, stop, i, null)); wirePopupNote(mk, stop, day); }
   try {
     const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${stop.lat}&lon=${stop.lng}&zoom=18&extratags=1&accept-language=zh-TW`);
     const d = await r.json();
@@ -1165,7 +1200,10 @@ async function ensurePoi(stop, day, i, mk) {
   } catch (e) {
     poiCache[stop.id] = { none: true };
   }
-  if (mk.isPopupOpen && mk.isPopupOpen()) mk.getPopup().setContent(popupHtml(day, stop, i, poiCache[stop.id]));
+  if (mk.isPopupOpen && mk.isPopupOpen() && !popupIsEditing(mk)) {
+    mk.getPopup().setContent(popupHtml(day, stop, i, poiCache[stop.id]));
+    wirePopupNote(mk, stop, day);
+  }
 }
 
 function renderMap() {
@@ -1193,8 +1231,9 @@ function renderMap() {
         popupAnchor: [0, -15]
       });
       const mk = L.marker([stop.lat, stop.lng], { icon, draggable: true }).addTo(overlay);
+      mk._stopId = stop.id;
       mk.bindPopup(popupHtml(day, stop, i, poiCache[stop.id]));
-      mk.on('popupopen', () => ensurePoi(stop, day, i, mk));
+      mk.on('popupopen', () => { wirePopupNote(mk, stop, day); ensurePoi(stop, day, i, mk); });
       markersById[stop.id] = mk;
       mk.on('dragend', e => {
         pushUndo();
