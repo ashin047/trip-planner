@@ -505,6 +505,20 @@
     background: #f6f2e9;
   }
   .day-footer .route-info { flex: 1; font-size: 11px; color: var(--muted); }
+  /* 空 Day 的加入 CTA */
+  .day-empty { padding: 12px 12px 14px; text-align: center; }
+  .day-empty-cta {
+    width: 100%; min-height: 42px;
+    border: none; border-radius: 11px;
+    background: linear-gradient(180deg, #54796b, var(--accent));
+    color: #fff; font-family: inherit; font-size: 14px; font-weight: 600;
+    letter-spacing: .3px; cursor: pointer;
+    box-shadow: 0 2px 6px rgba(56,86,75,.28);
+    transition: transform 80ms var(--ease), box-shadow var(--dur) var(--ease);
+  }
+  .day-empty-cta:hover { box-shadow: 0 4px 12px rgba(56,86,75,.34); }
+  .day-empty-cta:active { transform: scale(.98); }
+  .day-empty-sub { font-size: 11.5px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
   .day-footer .mini-btn {
     font-size: 11px; padding: 3px 8px;
     border: 1px solid var(--border); border-radius: 6px;
@@ -1146,7 +1160,7 @@
       </button>
       <button class="welcome-path primary" id="welcomeStartBtn">
         <span class="wp-emoji" aria-hidden="true">✏️</span>
-        <span class="wp-txt"><b>開始加入第一個地點</b><small>空白行程，馬上搜尋你想去的地方</small></span>
+        <span class="wp-txt"><b>開始加入第一站</b><small>空白行程，馬上搜尋你想去的地方</small></span>
       </button>
     </div>
     <button class="welcome-how" id="welcomeHowBtn" aria-expanded="false">還想了解更多功能？ ▾</button>
@@ -1944,29 +1958,38 @@ function renderSidebar() {
     });
     card.appendChild(ul);
 
-    // footer
-    const footer = document.createElement('div');
-    footer.className = 'day-footer';
-    footer.innerHTML = `
-      <span class="route-info" data-info="${day.id}">${day.stops.length >= 2 ? (day._info || '') : '點地圖或搜尋來加地點'}</span>
-      ${day.stops.length === 0 ? `<button class="mini-btn" data-act="search">🔍 搜尋地點</button>` : ''}
-      ${day.stops.length >= 2 ? `<button class="mini-btn" data-act="gmap">🚗 Google 導航</button>` : ''}
-      ${day.stops.length >= 1 ? `<button class="mini-btn" data-act="fit">🔍 縮放至此日</button>` : ''}
-    `;
-    const searchBtn = footer.querySelector('[data-act="search"]');
-    if (searchBtn) searchBtn.addEventListener('click', () => {
-      state.activeDayId = day.id; saveState(); renderSidebar();
-      if (window.innerWidth <= 760) document.getElementById('sidebar').classList.remove('open');
-      document.getElementById('searchInput').focus();
-    });
-    const gmapBtn = footer.querySelector('[data-act="gmap"]');
-    if (gmapBtn) gmapBtn.addEventListener('click', () => openInGoogleMaps(day));
-    const fitBtn = footer.querySelector('[data-act="fit"]');
-    if (fitBtn) fitBtn.addEventListener('click', () => {
-      map.fitBounds(L.latLngBounds(day.stops.map(s => [s.lat, s.lng])), { padding: [50, 50] });
-      if (window.innerWidth <= 760) document.getElementById('sidebar').classList.remove('open');
-    });
-    card.appendChild(footer);
+    if (day.stops.length === 0) {
+      // 空 Day：明顯的「＋ 加入第一個地點」CTA（比純提示文字更有行動感）
+      const empty = document.createElement('div');
+      empty.className = 'day-empty';
+      empty.innerHTML =
+        `<button class="day-empty-cta" data-act="addfirst">＋ 加入第一個地點</button>` +
+        `<div class="day-empty-sub">搜尋上方景點、餐廳、住宿，或直接點地圖加入</div>`;
+      empty.querySelector('[data-act="addfirst"]').addEventListener('click', () => {
+        state.activeDayId = day.id; saveState(); renderSidebar();
+        if (window.innerWidth <= 760) document.getElementById('sidebar').classList.remove('open');
+        const si = document.getElementById('searchInput');
+        si.scrollIntoView({ block: 'nearest' }); si.focus();
+      });
+      card.appendChild(empty);
+    } else {
+      // footer（有站點才顯示車程／導航／縮放）
+      const footer = document.createElement('div');
+      footer.className = 'day-footer';
+      footer.innerHTML = `
+        <span class="route-info" data-info="${day.id}">${day.stops.length >= 2 ? (day._info || '') : ''}</span>
+        ${day.stops.length >= 2 ? `<button class="mini-btn" data-act="gmap">🚗 Google 導航</button>` : ''}
+        <button class="mini-btn" data-act="fit">🔍 縮放至此日</button>
+      `;
+      const gmapBtn = footer.querySelector('[data-act="gmap"]');
+      if (gmapBtn) gmapBtn.addEventListener('click', () => openInGoogleMaps(day));
+      const fitBtn = footer.querySelector('[data-act="fit"]');
+      if (fitBtn) fitBtn.addEventListener('click', () => {
+        map.fitBounds(L.latLngBounds(day.stops.map(s => [s.lat, s.lng])), { padding: [50, 50] });
+        if (window.innerWidth <= 760) document.getElementById('sidebar').classList.remove('open');
+      });
+      card.appendChild(footer);
+    }
 
     list.appendChild(card);
   });
@@ -2002,6 +2025,9 @@ function addStop(lat, lng, name, type) {
   delete routeCache[day.id];
   saveState(); renderAll();
   toast(`已加入 ${day.name}：${name || '未命名地點'}｜可繼續搜下一站`);
+  // 加了第一站後，搜尋框改成引導繼續加下一站
+  const si = document.getElementById('searchInput');
+  if (si) si.placeholder = '繼續搜尋下一個地點加入行程…';
   // 名片高亮新站＋捲入視野（加入成功的明確回饋）
   const li = document.querySelector(`.stop-item[data-stopid="${newStop.id}"]`);
   if (li) {
@@ -2172,7 +2198,7 @@ function showPreview(lat, lng, name, type) {
     iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -17]
   });
   const mk = L.marker([lat, lng], { icon }).addTo(map);
-  mk.bindPopup(`<b>${esc(name)}</b><br><a href="#" onclick="return __addPreview()">➕ 加入行程</a>`).openPopup();
+  mk.bindPopup(`<b>${esc(name)}</b><br><a href="#" onclick="return __addPreview()">➕ 加入 ${esc(activeDayShort())}</a>`).openPopup();
   mk.on('popupclose', () => {
     if (previewMarker === mk) { previewMarker = null; map.removeLayer(mk); }
   });
