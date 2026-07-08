@@ -307,15 +307,19 @@
   .stop-move-wrap:hover { background: var(--accent-soft); color: var(--accent); }
   .drag-handle { cursor: grab; color: #cdc6b6; font-size: 13px; margin-top: 4px; flex-shrink: 0; transition: color var(--dur) var(--ease); }
   .drag-handle:hover { color: var(--muted); }
-  .stop-name-row { display: flex; align-items: center; gap: 3px; }
+  .stop-name-row { display: flex; align-items: center; gap: 5px; }
   .stop-type {
-    border: none; background: transparent; font-size: 14px;
-    cursor: pointer; padding: 0; width: 30px; flex-shrink: 0;
+    border: none; background: transparent; font-size: 15px;
+    cursor: pointer; padding: 0; width: 26px; height: 24px; flex-shrink: 0;
     font-family: inherit; outline: none;
-    border-radius: 6px;
+    border-radius: 7px;
+    text-align: center; text-align-last: center;
+    /* 移除原生下拉箭頭，避免與 emoji 重疊；改用 hover 底色提示可點 */
+    -webkit-appearance: none; -moz-appearance: none; appearance: none;
     transition: background var(--dur) var(--ease);
   }
-  .stop-type:hover { background: color-mix(in srgb, var(--day-c, var(--accent)) 12%, transparent); }
+  .stop-type:hover { background: color-mix(in srgb, var(--day-c, var(--accent)) 16%, transparent); }
+  .stop-type::-ms-expand { display: none; }
   .day-note {
     width: 100%;
     border: none;
