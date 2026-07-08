@@ -420,6 +420,13 @@
   #clearBtn { color: var(--danger); }
   #clearBtn:hover { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
   .popup-actions a { text-decoration: none; font-size: 12.5px; }
+  .popup-note {
+    display: inline-block; margin-top: 2px;
+    color: #7a8194; cursor: pointer;
+    border-bottom: 1px dashed transparent;
+  }
+  .popup-note:hover { border-bottom-color: #c3bba9; }
+  .popup-addnote { text-decoration: none; font-size: 12.5px; color: var(--accent); }
   .help-q {
     display: inline-flex; width: 18px; height: 18px; border-radius: 50%;
     border: 2px solid var(--accent); color: var(--accent);
@@ -1088,6 +1095,9 @@ window.__stopAction = function (act, dayId, stopId) {
   if (act === 'rename') {
     const v = prompt('這個地點的名稱：', stop.name);
     if (v && v.trim()) { pushUndo(); stop.name = v.trim(); saveState(); renderAll(); toast('已改名為「' + stop.name + '」'); }
+  } else if (act === 'note') {
+    const v = prompt('這個地點的備註（時間、票價、訂位號…）：', stop.note || '');
+    if (v !== null) { pushUndo(); stop.note = v.trim(); saveState(); renderAll(); toast(stop.note ? '備註已更新' : '已清除備註'); }
   } else if (act === 'delete') {
     if (confirm('移除「' + stop.name + '」？（可用復原鍵救回）')) {
       pushUndo();
@@ -1124,12 +1134,16 @@ function popupHtml(day, stop, i, poi) {
     if (poi.web) rows.push(`🌐 <a href="${esc(poi.web)}" target="_blank" rel="noopener">官方網站</a>`);
     poiHtml = `<br><span style="font-size:12px;line-height:1.7">${rows.join('<br>')}</span>`;
   }
+  const noteHtml = stop.note
+    ? `<br><span class="popup-note" onclick="return __stopAction('note','${day.id}','${stop.id}')" title="點擊編輯備註">📝 ${esc(stop.note)}</span>`
+    : `<br><a href="#" class="popup-addnote" onclick="return __stopAction('note','${day.id}','${stop.id}')">＋ 加備註</a>`;
   return `<b>${esc(day.name)}・第 ${i + 1} 站</b><br>${stop.type || '📍'} ${esc(stop.name)}` +
-    (stop.note ? `<br><span style="color:#7a8194">${esc(stop.note)}</span>` : '') +
+    noteHtml +
     poiHtml +
     `<br><span class="popup-actions">` +
     `<a href="#" onclick="return __stopAction('rename','${day.id}','${stop.id}')">✏️ 改名</a>　` +
-    `<a href="#" onclick="return __stopAction('delete','${day.id}','${stop.id}')" style="color:#d93025">🗑️ 移除</a>` +
+    `<a href="#" onclick="return __stopAction('note','${day.id}','${stop.id}')">📝 備註</a>　` +
+    `<a href="#" onclick="return __stopAction('delete','${day.id}','${stop.id}')" style="color:#b8483d">🗑️ 移除</a>` +
     `</span>` +
     `<br><a href="https://www.google.com/maps/search/?api=1&query=${stop.lat},${stop.lng}" target="_blank">在 Google Maps 開啟</a>` +
     affLink;
