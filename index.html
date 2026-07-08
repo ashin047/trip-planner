@@ -377,13 +377,36 @@
   .stop-num:hover { transform: scale(1.12); box-shadow: 0 2px 7px color-mix(in srgb, var(--day-c, var(--accent)) 40%, transparent); }
   .stop-num:active { cursor: grabbing; }
   .stop-body { flex: 1; min-width: 0; padding-top: 1px; }
-  .stop-name { font-weight: 600; border: none; background: transparent; outline: none; width: 100%; font-size: 13.5px; font-family: inherit; color: var(--text); }
+  .stop-name { font-weight: 600; border: none; background: transparent; outline: none; width: 100%; font-size: 14.5px; font-family: inherit; color: var(--text); letter-spacing: .2px; }
   .stop-name:focus { color: var(--accent-strong); }
   .stop-note {
     width: 100%; border: none; background: transparent; outline: none;
-    font-size: 12px; color: var(--muted); font-family: inherit; resize: none;
-    margin-top: 1px; line-height: 1.5;
+    font-size: 11.5px; color: #9a917f; font-family: inherit; resize: none;
+    margin-top: 2px; line-height: 1.5;
   }
+  .stop-note:focus { color: var(--muted); }
+  /* 站點「⋯」浮動選單 */
+  #stopMenu {
+    display: none; position: fixed; z-index: 3200;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; box-shadow: var(--shadow-lg);
+    padding: 5px; min-width: 168px; max-height: 60vh; overflow-y: auto;
+  }
+  #stopMenu.open { display: block; }
+  .sm-item {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    padding: 8px 10px; border: none; background: none; cursor: pointer;
+    font-family: inherit; font-size: 13px; color: var(--text);
+    border-radius: 8px; text-align: left;
+    transition: background var(--dur) var(--ease);
+  }
+  .sm-item:hover { background: var(--accent-soft); }
+  .sm-item svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2.1; fill: none; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+  .sm-item.danger { color: var(--danger); }
+  .sm-item.danger:hover { background: var(--danger-soft); }
+  .sm-item .sm-arrow { width: 16px; text-align: center; color: var(--muted); flex-shrink: 0; }
+  .sm-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+  .sm-label { font-size: 11px; color: var(--muted); padding: 4px 10px 2px; font-weight: 600; }
   .stop-actions {
     display: flex; flex-direction: column; gap: 1px; flex-shrink: 0;
     align-items: center;
@@ -879,31 +902,23 @@
     transition: opacity var(--dur) var(--ease);
   }
 
+  /* 手機底部固定列（行程 / ＋加入地點）—— 桌面隱藏 */
+  #mobileBar { display: none; }
+
   @media (max-width: 760px) {
     #sidebar {
       position: absolute;
       top: 0; left: 0; bottom: 0;
-      width: min(85vw, 330px);
+      width: min(88vw, 340px);
       transform: translateX(-100%);
       transition: transform 240ms var(--ease);
       box-shadow: 4px 0 20px rgba(0,0,0,.2);
-      padding-bottom: env(safe-area-inset-bottom);
+      padding-bottom: calc(env(safe-area-inset-bottom) + 4px);
     }
     #sidebar.open { transform: translateX(0); }
     #sidebar.open ~ #sidebarBackdrop { display: block; opacity: 1; }
-    #sidebarToggle {
-      display: flex; align-items: center; gap: 6px;
-      top: auto; bottom: calc(14px + env(safe-area-inset-bottom));
-      left: 12px;
-      min-height: 44px;
-      padding: 10px 16px;
-      border-radius: 22px;
-      background: var(--accent); color: #fff; border-color: var(--accent);
-      box-shadow: var(--shadow-lg);
-      font-size: 14px; font-weight: 600;
-    }
     #topbar h1 { display: none; }
-    /* 手機：搜尋佔滿第一行，加入到 Day X ＋設定退到第二行左側 */
+    /* 手機：搜尋佔滿整行為主角，加入到 Day X ＋設定退到第二行 */
     #topbar { gap: 8px; padding: 8px 10px; }
     #searchWrap { flex-basis: 100%; max-width: none; order: 1; }
     #dayTargetWrap { order: 2; }
@@ -913,10 +928,39 @@
     /* iOS：輸入框 <16px 會觸發自動放大 */
     #searchInput, .stop-name, .stop-note, .day-name, #saveNameInput { font-size: 16px; }
     #hint { max-width: 92vw; white-space: normal; text-align: center; }
-    /* CTA 卡副標在窄螢幕縮小避免截斷 */
     .tl-txt small { font-size: 10px; letter-spacing: -.2px; }
-    /* 側欄打開時隱藏浮動按鈕，避免擋住底部功能列 */
-    #sidebar.open + #sidebarToggle { display: none; }
+    /* 地圖底部留白，不被底部列蓋住 */
+    #map { padding-bottom: 0; }
+
+    /* 底部固定列：兩個主入口 */
+    #mobileBar {
+      display: flex; gap: 10px;
+      position: absolute; left: 0; right: 0;
+      bottom: 0; z-index: 1060;
+      padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+      background: linear-gradient(180deg, rgba(245,241,232,0), var(--bg) 40%);
+      pointer-events: none;
+    }
+    #mobileBar button {
+      pointer-events: auto;
+      flex: 1; min-height: 48px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      border: 1px solid var(--border); border-radius: 26px;
+      background: var(--panel); color: var(--text);
+      font-family: inherit; font-size: 15px; font-weight: 600;
+      box-shadow: var(--shadow-lg); cursor: pointer;
+    }
+    #mobileBar button svg { width: 19px; height: 19px; stroke: currentColor; stroke-width: 2.1; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    #mobileBar button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    #mobileBar .mb-count {
+      min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px;
+      border-radius: 9px; background: var(--accent); color: #fff;
+      font-size: 11px; font-weight: 700;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    /* 側欄打開時，底部列與地圖浮水印讓位 */
+    #sidebar.open ~ #mobileBar { display: none; }
+    #mapEmptyHint { bottom: 72px; }
   }
 </style>
 </head>
@@ -1017,8 +1061,11 @@
       <input type="file" id="importFile" accept=".json" style="display:none">
     </div>
   </div>
-  <button class="btn" id="sidebarToggle" aria-label="開啟行程清單">📅 行程</button>
   <div id="sidebarBackdrop" aria-hidden="true"></div>
+  <div id="mobileBar" aria-hidden="true">
+    <button id="mbTrip"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg><span>行程<span class="mb-count" id="mbCount"></span></span></button>
+    <button id="mbAdd" class="primary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>加入地點</span></button>
+  </div>
   <div id="map"></div>
   <div id="hint">點一下地圖，就會把地點加進目前選中的那一天</div>
   <div id="mapEmptyHint" aria-hidden="true">
@@ -1030,6 +1077,7 @@
 </div>
 
 <div id="toast" role="status" aria-live="polite"></div>
+<div id="stopMenu" role="menu" aria-label="地點操作"></div>
 
 <div id="shareModal" role="dialog" aria-modal="true" aria-label="分享與共同編輯">
   <div class="modal-box">
@@ -1155,7 +1203,8 @@ const ICONS = {
   pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="12" r="2.5"/></svg>',
   locate: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>',
   moveDay: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M11 15l2.2 2.2L11 19.4"/></svg>',
-  trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V7M18 7l-.9 12.1a2 2 0 0 1-2 1.9H8.9a2 2 0 0 1-2-1.9L6 7M10 11.5v5M14 11.5v5"/></svg>'
+  trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V7M18 7l-.9 12.1a2 2 0 0 1-2 1.9H8.9a2 2 0 0 1-2-1.9L6 7M10 11.5v5M14 11.5v5"/></svg>',
+  dots: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>'
 };
 
 /* ============ 公開版設定 ============ */
@@ -1621,6 +1670,67 @@ function setAllCollapsed(collapse) {
   saveCollapsed(); renderSidebar();
 }
 
+/* ============ 站點「⋯」操作選單（收斂工具感） ============ */
+const stopMenuEl = document.getElementById('stopMenu');
+function closeStopMenu() { stopMenuEl.classList.remove('open'); }
+document.addEventListener('click', e => { if (!e.target.closest('#stopMenu')) closeStopMenu(); });
+window.addEventListener('resize', closeStopMenu);
+function openStopMenu(btn, day, stop, si) {
+  const others = state.days.filter(d => d.id !== day.id);
+  const rows = [];
+  rows.push(`<button class="sm-item" data-sm="focus">${ICONS.locate}<span>在地圖上顯示</span></button>`);
+  if (others.length) {
+    rows.push(`<div class="sm-sep"></div>`);
+    rows.push(`<div class="sm-label">移到其他天</div>`);
+    others.forEach(d => {
+      const i = state.days.indexOf(d);
+      const label = d.name && d.name.length <= 14 ? d.name : `Day ${i + 1}`;
+      rows.push(`<button class="sm-item" data-sm="move" data-day="${d.id}"><span class="sm-arrow">→</span><span>${esc(label)}</span></button>`);
+    });
+  }
+  rows.push(`<div class="sm-sep"></div>`);
+  rows.push(`<button class="sm-item danger" data-sm="del">${ICONS.trash}<span>移除這個地點</span></button>`);
+  stopMenuEl.innerHTML = rows.join('');
+
+  // 定位：對齊按鈕右緣下方，避免超出視窗
+  stopMenuEl.classList.add('open');
+  const r = btn.getBoundingClientRect();
+  const mw = stopMenuEl.offsetWidth, mh = stopMenuEl.offsetHeight;
+  let left = Math.min(r.right - mw, window.innerWidth - mw - 8);
+  let top = r.bottom + 4;
+  if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
+  stopMenuEl.style.left = Math.max(8, left) + 'px';
+  stopMenuEl.style.top = top + 'px';
+
+  stopMenuEl.querySelectorAll('.sm-item').forEach(item => {
+    item.addEventListener('click', e => {
+      e.stopPropagation();
+      const act = item.dataset.sm;
+      closeStopMenu();
+      if (act === 'focus') {
+        map.setView([stop.lat, stop.lng], Math.max(map.getZoom(), 13));
+        if (markersById[stop.id]) markersById[stop.id].openPopup();
+        if (window.innerWidth <= 760) document.getElementById('sidebar').classList.remove('open');
+      } else if (act === 'move') {
+        const target = getDay(item.dataset.day);
+        if (!target) return;
+        pushUndo();
+        day.stops.splice(si, 1);
+        target.stops.push(stop);
+        delete routeCache[day.id]; delete routeCache[target.id];
+        saveState(); renderAll();
+        toast(`已把「${stop.name}」移到 ${target.name}`);
+      } else if (act === 'del') {
+        pushUndo();
+        day.stops.splice(si, 1);
+        delete routeCache[day.id];
+        saveState(); renderAll();
+        toast('已移除，可按復原鍵救回');
+      }
+    });
+  });
+}
+
 /* ============ 渲染：側邊欄 ============ */
 function renderSidebar() {
   const list = document.getElementById('dayList');
@@ -1742,27 +1852,12 @@ function renderSidebar() {
         <div class="stop-actions">
           <button class="icon-btn touch-only" data-act="mvup" title="上移" aria-label="這個地點往上移">${ICONS.up}</button>
           <button class="icon-btn touch-only" data-act="mvdown" title="下移" aria-label="這個地點往下移">${ICONS.down}</button>
-          <button class="icon-btn" data-act="focus" title="在地圖上顯示" aria-label="在地圖上顯示這個地點">${ICONS.locate}</button>
-          <span class="icon-btn stop-move-wrap" title="移到其他天">
-            ${ICONS.moveDay}
-            <select class="stop-move" aria-label="把這個地點移到其他天">
-              <option value="">移到其他天…</option>
-              ${state.days.filter(d => d.id !== day.id).map(d => `<option value="${d.id}">→ ${esc(d.name)}</option>`).join('')}
-            </select>
-          </span>
-          <button class="icon-btn danger" data-act="del" title="移除這個地點" aria-label="移除這個地點">${ICONS.trash}</button>
+          <button class="icon-btn stop-menu-btn" data-act="menu" title="更多操作" aria-label="更多操作">${ICONS.dots}</button>
         </div>
       `;
-      li.querySelector('.stop-move').addEventListener('change', e => {
-        const target = getDay(e.target.value);
-        if (!target) { e.target.value = ''; return; }
-        pushUndo();
-        day.stops.splice(si, 1);
-        target.stops.push(stop);
-        delete routeCache[day.id];
-        delete routeCache[target.id];
-        saveState(); renderAll();
-        toast(`已把「${stop.name}」移到 ${target.name}`);
+      li.querySelector('[data-act="menu"]').addEventListener('click', e => {
+        e.stopPropagation();
+        openStopMenu(e.currentTarget, day, stop, si);
       });
       li.querySelector('.stop-type').addEventListener('change', e => {
         if (e.target.value === '__custom__') {
@@ -1775,10 +1870,6 @@ function renderSidebar() {
       });
       li.querySelector('.stop-name').addEventListener('change', e => { stop.name = e.target.value; saveState(); renderMap(); });
       li.querySelector('.stop-note').addEventListener('change', e => { stop.note = e.target.value; saveState(); });
-      li.querySelector('[data-act="focus"]').addEventListener('click', () => {
-        map.setView([stop.lat, stop.lng], Math.max(map.getZoom(), 13));
-        if (window.innerWidth <= 760) document.getElementById('sidebar').classList.remove('open');
-      });
       li.querySelector('[data-act="mvup"]').addEventListener('click', () => {
         if (si === 0) return;
         pushUndo();
@@ -1792,12 +1883,6 @@ function renderSidebar() {
         pushUndo();
         day.stops.splice(si, 1);
         day.stops.splice(si + 1, 0, stop);
-        delete routeCache[day.id];
-        saveState(); renderAll();
-      });
-      li.querySelector('[data-act="del"]').addEventListener('click', () => {
-        pushUndo();
-        day.stops.splice(si, 1);
         delete routeCache[day.id];
         saveState(); renderAll();
       });
@@ -1870,6 +1955,8 @@ function renderSidebar() {
   const totalStops = state.days.reduce((n, d) => n + d.stops.length, 0);
   const meh = document.getElementById('mapEmptyHint');
   if (meh) meh.classList.toggle('show', totalStops === 0);
+  const mbCount = document.getElementById('mbCount');
+  if (mbCount) mbCount.textContent = totalStops || '';
 }
 
 function renderAll() { renderSidebar(); renderMap(); }
@@ -2262,8 +2349,15 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   saveState(); renderAll();
 });
 
-document.getElementById('sidebarToggle').addEventListener('click', () => {
+/* 手機底部固定列 */
+document.getElementById('mbTrip').addEventListener('click', () => {
   document.getElementById('sidebar').classList.toggle('open');
+});
+document.getElementById('mbAdd').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.remove('open');
+  const si = document.getElementById('searchInput');
+  si.scrollIntoView({ block: 'nearest' });
+  si.focus();
 });
 document.getElementById('moreToolsBtn').addEventListener('click', () => {
   const mt = document.getElementById('moreTools');
