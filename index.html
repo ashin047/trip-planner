@@ -501,11 +501,15 @@
 
   .day-footer {
     display: flex; align-items: center; gap: 6px;
-    padding: 7px 10px;
+    flex-wrap: wrap;                 /* 按鈕放不下時換行，不擠壓車程文字 */
+    padding: 8px 10px;
     border-top: 1px solid var(--border);
     background: #f6f2e9;
   }
-  .day-footer .route-info { flex: 1; font-size: 11px; color: var(--muted); }
+  /* 車程資訊獨佔第一行，避免被按鈕擠成一字一行 */
+  .day-footer .route-info { flex-basis: 100%; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+  .day-footer .route-info:empty { display: none; }
+  .day-footer .mini-btn { flex: 0 0 auto; }
   /* 空 Day 的加入 CTA */
   .day-empty { padding: 12px 12px 14px; text-align: center; }
   .day-empty-cta {
@@ -2094,15 +2098,9 @@ function renderSidebar() {
         <span class="route-info" data-info="${day.id}">${day.stops.length >= 2 ? (day._info || '') : ''}</span>
         <a class="mini-btn mini-aff" data-aff="booking" href="${stayUrl}" target="_blank" rel="sponsored nofollow noopener">${stayLabel}</a>
         ${day.stops.length >= 2 ? `<button class="mini-btn" data-act="gmap">🚗 Google 導航</button>` : ''}
-        <button class="mini-btn" data-act="fit">🔍 縮放至此日</button>
       `;
       const gmapBtn = footer.querySelector('[data-act="gmap"]');
       if (gmapBtn) gmapBtn.addEventListener('click', () => openInGoogleMaps(day));
-      const fitBtn = footer.querySelector('[data-act="fit"]');
-      if (fitBtn) fitBtn.addEventListener('click', () => {
-        map.fitBounds(L.latLngBounds(day.stops.map(s => [s.lat, s.lng])), { padding: [50, 50] });
-        if (window.innerWidth <= 760) document.getElementById('sidebar').classList.remove('open');
-      });
       card.appendChild(footer);
     }
 
