@@ -176,6 +176,17 @@
     justify-content: space-between;
   }
   #sidebarHeader .title { font-size: 15px; font-weight: 700; font-family: var(--serif); letter-spacing: .5px; margin-right: auto; }
+  .btn.icon-only { padding: 7px 9px; display: inline-flex; align-items: center; justify-content: center; }
+  .day-collapse { flex-shrink: 0; color: var(--muted); }
+  .day-collapse:hover { color: var(--accent); }
+  /* 收合卡：精簡成單行（標題＋日期站數＋展開鈕），30 天一眼掃 */
+  .collapsed-count { display: none; }
+  .day-card.collapsed { margin-bottom: 7px; }
+  .day-card.collapsed .day-header { padding: 8px 11px; }
+  .day-card.collapsed .day-sub-row { display: none; }
+  .day-card.collapsed .day-color-dot { width: 20px; height: 20px; font-size: 11px; }
+  .day-card.collapsed .day-name { font-size: 13.5px; }
+  .day-card.collapsed .collapsed-count { display: inline; font-size: 11px; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
   #dayList { flex: 1; overflow-y: auto; padding: 12px 12px 4px; }
 
   .day-card {
@@ -816,7 +827,8 @@
   <div id="sidebar">
     <div id="sidebarHeader">
       <span class="title">📅 行程安排</span>
-      <button class="btn" id="undoBtn" title="復原上一步（Ctrl+Z）"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10a6 6 0 0 1 0 12h-3"/><path d="M7 4 3 8l4 4"/></svg></button>
+      <button class="btn icon-only" id="collapseAllBtn" title="全部收合／展開" aria-label="全部收合或展開各天"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h13M8 9h13M8 15h13M8 20h13M3 5l2 2 2-2M3 18l2-2 2 2"/></svg></button>
+      <button class="btn icon-only" id="undoBtn" title="復原上一步（Ctrl+Z）"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10a6 6 0 0 1 0 12h-3"/><path d="M7 4 3 8l4 4"/></svg></button>
       <button class="btn primary" id="addDayBtn">＋ 新增一天</button>
     </div>
     <div id="dateRow">
@@ -880,6 +892,7 @@
         <p class="desc">把目前的行程打包成一條連結。朋友打開會載入一份<b>副本</b>，他改他的、你的不會動。行程全部壓縮在連結裡，不會上傳到任何伺服器。</p>
         <button class="btn primary" id="copyShareLinkBtn">📋 複製分享連結</button>
         <div class="share-link-box" id="shareLinkBox"></div>
+        <div id="shareLongHint" style="display:none;margin-top:8px;font-size:12px;color:var(--accent2);line-height:1.6">⚠️ 行程較大、連結很長，LINE 等 App 可能會截斷。<b>大行程建議改用下方「共同編輯」</b>的雲端短連結分享。</div>
       </div>
       <div class="share-section">
         <h3>👥 共同編輯</h3>
@@ -952,14 +965,19 @@ function migrateColors(days) {
   (days || []).forEach(d => { if (LEGACY_COLOR_MAP[d.color]) d.color = LEGACY_COLOR_MAP[d.color]; });
 }
 /* 第 17 天起調色盤循環時逐輪加深 15%，長行程不撞色 */
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => { const c = l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); return Math.round(255 * c); };
+  return '#' + [f(0), f(8), f(4)].map(x => x.toString(16).padStart(2, '0')).join('');
+}
 function dayColorAt(i) {
-  const base = DAY_COLORS[i % DAY_COLORS.length];
-  const round = Math.floor(i / DAY_COLORS.length);
-  if (!round) return base;
-  const n = parseInt(base.slice(1), 16);
-  const f = Math.max(.4, 1 - .15 * round);
-  const r = Math.round(((n >> 16) & 255) * f), g = Math.round(((n >> 8) & 255) * f), b = Math.round((n & 255) * f);
-  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  if (i < DAY_COLORS.length) return DAY_COLORS[i];
+  // 超過 16 天 → 黃金角 HSL 生成柔和但彼此可辨識的色（長行程不撞色、仍保持啞色調性）
+  const hue = (i * 137.5) % 360;
+  const light = 48 + ((i % 3) * 6);   // 48/54/60 三階明度，進一步拉開相近色
+  return hslToHex(hue, 40, light);
 }
 const STOP_TYPES = [
   ['📍','景點'], ['🍽️','美食'], ['☕','咖啡'], ['🛏️','住宿'],
@@ -1295,6 +1313,22 @@ function buildParts(day) {
   return parts.filter(p => p.kind === 'flight' || p.idxs.length >= 2);
 }
 
+/* OSRM 請求節流：最多同時 4 個，其餘排隊，避免 30 天行程一次打爆免費路由伺服器 */
+const _osrm = { active: 0, max: 4, q: [] };
+function osrmFetch(url) {
+  return new Promise((resolve, reject) => {
+    _osrm.q.push({ url, resolve, reject });
+    _pumpOsrm();
+  });
+}
+function _pumpOsrm() {
+  while (_osrm.active < _osrm.max && _osrm.q.length) {
+    const job = _osrm.q.shift();
+    _osrm.active++;
+    fetch(job.url).then(job.resolve, job.reject).finally(() => { _osrm.active--; _pumpOsrm(); });
+  }
+}
+
 function drawRoute(day) {
   const mode = document.getElementById('routeMode').value;
   const key = routeKey(day);
@@ -1363,7 +1397,7 @@ function drawRoute(day) {
 
   Promise.all(driveParts.map(p => {
     const coords = p.idxs.map(ix => `${day.stops[ix].lng},${day.stops[ix].lat}`).join(';');
-    return fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`)
+    return osrmFetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`)
       .then(r => r.json())
       .then(data => {
         if (data.code !== 'Ok' || !data.routes || !data.routes[0]) return null;
@@ -1415,13 +1449,27 @@ function updateDayInfo(day) {
   if (el) el.textContent = day._info || '';
 }
 
+/* ============ 天收合狀態（存 localStorage、不進行程資料，避免污染分享/共編） ============ */
+let collapsedDays = new Set();
+try { collapsedDays = new Set(JSON.parse(localStorage.getItem('trip-map-planner-collapsed') || '[]')); } catch (e) {}
+function saveCollapsed() { try { localStorage.setItem('trip-map-planner-collapsed', JSON.stringify([...collapsedDays])); } catch (e) {} }
+function toggleDayCollapse(id) {
+  if (collapsedDays.has(id)) collapsedDays.delete(id); else collapsedDays.add(id);
+  saveCollapsed(); renderSidebar();
+}
+function setAllCollapsed(collapse) {
+  collapsedDays = new Set(collapse ? state.days.map(d => d.id) : []);
+  saveCollapsed(); renderSidebar();
+}
+
 /* ============ 渲染：側邊欄 ============ */
 function renderSidebar() {
   const list = document.getElementById('dayList');
   list.innerHTML = '';
   state.days.forEach((day, di) => {
+    const collapsed = collapsedDays.has(day.id);
     const card = document.createElement('div');
-    card.className = 'day-card' + (day.id === state.activeDayId ? ' active' : '');
+    card.className = 'day-card' + (day.id === state.activeDayId ? ' active' : '') + (collapsed ? ' collapsed' : '');
     card.style.setProperty('--day-c', day.color);
 
     // header
@@ -1431,6 +1479,8 @@ function renderSidebar() {
       <div class="day-title-row">
         <span class="day-color-dot" title="點擊換顏色">${di + 1}</span>
         <input class="day-name" value="${esc(day.name)}" title="點擊改名" aria-label="第 ${di + 1} 天名稱">
+        <span class="collapsed-count">${dayDateLabel(di).replace(/・$/, '')}${dayDateLabel(di) ? '・' : ''}${day.stops.length} 站</span>
+        <button class="icon-btn day-collapse" data-act="collapse" title="${collapsed ? '展開' : '收合'}" aria-label="${collapsed ? '展開這一天' : '收合這一天'}">${collapsed ? ICONS.down : ICONS.up}</button>
       </div>
       <div class="day-sub-row">
         <span class="day-meta">${dayDateLabel(di)}<span class="meta-count">${day.stops.length} 站</span></span>
@@ -1488,9 +1538,14 @@ function renderSidebar() {
       state.days = state.days.filter(d => d.id !== day.id);
       if (state.activeDayId === day.id) state.activeDayId = state.days[0] ? state.days[0].id : null;
       delete routeCache[day.id];
+      collapsedDays.delete(day.id);
       saveState(); renderAll();
     });
+    header.querySelector('[data-act="collapse"]').addEventListener('click', () => toggleDayCollapse(day.id));
     card.appendChild(header);
+
+    // 收合狀態：只顯示標題列，跳過備註/站點/footer（長行程一眼掃 30 天）
+    if (collapsed) { list.appendChild(card); return; }
 
     // 每日備註（有內容時永遠顯示；選中的那天也顯示，方便隨時記）
     if (day.note || day.id === state.activeDayId) {
@@ -1659,7 +1714,7 @@ function renderSidebar() {
 function renderAll() { renderSidebar(); renderMap(); }
 
 /* ============ 加地點 ============ */
-function addStop(lat, lng, name) {
+function addStop(lat, lng, name, type) {
   pushUndo();
   let day = activeDay();
   if (!day) {
@@ -1668,7 +1723,7 @@ function addStop(lat, lng, name) {
     state.activeDayId = day.id;
   }
   if (!day.visible) day.visible = true; // 加點時自動顯示該天，避免「加了卻看不到」
-  const newStop = { id: uid(), name: name || `地點 ${day.stops.length + 1}`, lat: +lat.toFixed(6), lng: +lng.toFixed(6), note: '', type: '📍' };
+  const newStop = { id: uid(), name: name || `地點 ${day.stops.length + 1}`, lat: +lat.toFixed(6), lng: +lng.toFixed(6), note: '', type: type || '📍' };
   day.stops.push(newStop);
   delete routeCache[day.id];
   saveState(); renderAll();
@@ -1787,7 +1842,18 @@ const NZ_POI = [
   { n: ['教堂灣', '大教堂灣'], en: 'Cathedral Cove', lat: -36.8277, lng: 175.7906, z: 15 },
   { n: ['懷歐塔普', '地熱世界'], en: 'Wai-O-Tapu', lat: -38.356, lng: 176.368, z: 14 },
   { n: ['納皮爾', 'napier'], en: 'Napier', lat: -39.4928, lng: 176.912, z: 13 },
-  { n: ['瑪塔瑪塔', 'matamata'], en: 'Matamata', lat: -37.809, lng: 175.773, z: 13 }
+  { n: ['瑪塔瑪塔', 'matamata'], en: 'Matamata', lat: -37.809, lng: 175.773, z: 13 },
+  // ── 機場（飛機抵達／出發、也是租車取還點）──
+  { n: ['奧克蘭機場', '奧克蘭國際機場', '奥克兰机场', 'akl', 'auckland airport'], en: 'Auckland Airport (AKL)', lat: -37.0082, lng: 174.785, z: 14, t: '✈️' },
+  { n: ['基督城機場', '基督城國際機場', 'christchurch airport', 'chc'], en: 'Christchurch Airport (CHC)', lat: -43.4894, lng: 172.532, z: 14, t: '✈️' },
+  { n: ['皇后鎮機場', '皇后镇机场', 'queenstown airport', 'zqn'], en: 'Queenstown Airport (ZQN)', lat: -45.0211, lng: 168.7392, z: 14, t: '✈️' },
+  { n: ['威靈頓機場', '威灵顿机场', 'wellington airport', 'wlg'], en: 'Wellington Airport (WLG)', lat: -41.3272, lng: 174.8053, z: 14, t: '✈️' },
+  { n: ['但尼丁機場', 'dunedin airport', 'dud'], en: 'Dunedin Airport (DUD)', lat: -45.9281, lng: 170.1985, z: 13, t: '✈️' },
+  { n: ['羅托魯瓦機場', 'rotorua airport', 'rot'], en: 'Rotorua Airport (ROT)', lat: -38.1092, lng: 176.3172, z: 14, t: '✈️' },
+  // ── 租車主要取車點（多在機場）──
+  { n: ['奧克蘭機場租車', '奧克蘭租車', '奧克蘭取車'], en: 'Car Rental — Auckland Airport', lat: -37.0082, lng: 174.785, z: 14, t: '🚗' },
+  { n: ['基督城機場租車', '基督城租車'], en: 'Car Rental — Christchurch Airport', lat: -43.4894, lng: 172.532, z: 14, t: '🚗' },
+  { n: ['皇后鎮機場租車', '皇后鎮租車'], en: 'Car Rental — Queenstown Airport', lat: -45.0211, lng: 168.7392, z: 14, t: '🚗' }
 ];
 function searchLocalDict(qRaw) {
   const q = qRaw.trim().toLowerCase().replace(/\s+/g, '');
@@ -1797,8 +1863,9 @@ function searchLocalDict(qRaw) {
     let s = 0;
     for (const alias of p.n) {
       const a = alias.toLowerCase().replace(/\s+/g, '');
-      if (a === q) { s = 3; break; }
-      if (a.includes(q) || q.includes(a)) s = Math.max(s, 2);
+      if (a === q) s = Math.max(s, 1000);                    // 完全相符
+      else if (q.includes(a)) s = Math.max(s, 100 + a.length); // 查詢含別名：別名越長＝越精確（「奧克蘭機場」勝過「奧克蘭」）
+      else if (a.includes(q)) s = Math.max(s, 40 + q.length);  // 別名含查詢（前綴式）
     }
     if (s) scored.push([s, p]);
   });
@@ -1812,15 +1879,15 @@ window.__addPreview = function () {
   const mk = previewMarker;
   previewMarker = null;
   if (mk) map.removeLayer(mk);
-  if (p) addStop(p.lat, p.lng, p.name);
+  if (p) addStop(p.lat, p.lng, p.name, p.type);
   return false;
 };
-function showPreview(lat, lng, name) {
+function showPreview(lat, lng, name, type) {
   if (previewMarker) { map.removeLayer(previewMarker); previewMarker = null; }
-  window.__previewData = { lat, lng, name };
+  window.__previewData = { lat, lng, name, type };
   const icon = L.divIcon({
     className: '',
-    html: `<div class="preview-marker">📍</div>`,
+    html: `<div class="preview-marker">${type || '📍'}</div>`,
     iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -17]
   });
   const mk = L.marker([lat, lng], { icon }).addTo(map);
@@ -1831,13 +1898,16 @@ function showPreview(lat, lng, name) {
   previewMarker = mk;
 }
 
-function appendSearchItem(main, sub, lat, lng, zoom, isDict) {
+function appendSearchItem(main, sub, lat, lng, zoom, isDict, type) {
   const item = document.createElement('div');
   item.className = 'search-item';
-  item.innerHTML = `<div><b>${esc(main)}</b>${isDict ? '<span class="dict-badge">精選</span>' : ''}</div><div class="sub">${esc(sub)}</div>`;
+  const tag = type === '✈️' ? '<span class="dict-badge" style="background:#e7edf4;color:#5b7da3">機場</span>'
+    : type === '🚗' ? '<span class="dict-badge" style="background:#f4e9de;color:#bd7048">租車</span>'
+    : (isDict ? '<span class="dict-badge">精選</span>' : '');
+  item.innerHTML = `<div><b>${esc(main)}</b>${tag}</div><div class="sub">${esc(sub)}</div>`;
   item.addEventListener('click', () => {
     map.setView([lat, lng], zoom || 14);
-    showPreview(lat, lng, main);
+    showPreview(lat, lng, main, type);
     searchResults.style.display = 'none';
     searchInput.value = '';
   });
@@ -1850,7 +1920,7 @@ function doSearch(q) {
   searchResults.style.display = 'block';
   // 1) 內建紐西蘭景點字典（中文 OK、即時）
   const dictHits = searchLocalDict(q);
-  dictHits.forEach(p => appendSearchItem(p.n[0], `${p.en}・紐西蘭`, p.lat, p.lng, p.z, true));
+  dictHits.forEach(p => appendSearchItem(p.n[0], `${p.en}・紐西蘭`, p.lat, p.lng, p.z, true, p.t));
   // 2) OpenStreetMap 全球搜尋
   const loading = document.createElement('div');
   loading.className = 'search-item';
@@ -1915,6 +1985,12 @@ document.getElementById('addDayBtn').addEventListener('click', () => {
   state.days.push(day);
   state.activeDayId = day.id;
   saveState(); renderAll();
+});
+document.getElementById('collapseAllBtn').addEventListener('click', () => {
+  // 只要有任何一天是展開的 → 全部收合；否則全部展開
+  const anyOpen = state.days.some(d => !collapsedDays.has(d.id));
+  setAllCollapsed(anyOpen);
+  toast(anyOpen ? '已收合全部（點單天標題可展開）' : '已展開全部');
 });
 
 document.getElementById('exportBtn').addEventListener('click', () => {
@@ -2369,7 +2445,13 @@ document.getElementById('copyShareLinkBtn').addEventListener('click', () => {
   const box = document.getElementById('shareLinkBox');
   box.textContent = link;
   box.classList.add('show');
-  const done = () => toast(link.length > 8000 ? '已複製！連結較長，用 LINE 傳請直接貼上、不要手動斷行' : '已複製分享連結，貼給朋友吧！');
+  const tooLong = link.length > 4000;
+  // 大行程：連結過長，提醒改用雲端共編（若已開通）
+  const hint = document.getElementById('shareLongHint');
+  if (hint) hint.style.display = tooLong ? 'block' : 'none';
+  const done = () => toast(tooLong
+    ? '已複製，但行程較大、連結很長（部分 App 可能截斷）。大行程建議改用下方「共同編輯」的雲端連結'
+    : '已複製分享連結，貼給朋友吧！');
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(link).then(done).catch(() => fallbackCopy(link, done));
   } else fallbackCopy(link, done);
