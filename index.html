@@ -59,10 +59,12 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
   }
-  /* 細滾動條，避免側欄視覺太重 */
+  /* 細滾動條，配合暖色紙感 */
   #dayList::-webkit-scrollbar, .modal-body::-webkit-scrollbar { width: 8px; }
-  #dayList::-webkit-scrollbar-thumb, .modal-body::-webkit-scrollbar-thumb { background: #d4d8e0; border-radius: 4px; }
+  #dayList::-webkit-scrollbar-thumb, .modal-body::-webkit-scrollbar-thumb { background: #d8cfbd; border-radius: 4px; }
+  #dayList::-webkit-scrollbar-thumb:hover, .modal-body::-webkit-scrollbar-thumb:hover { background: #c7bda6; }
   #dayList::-webkit-scrollbar-track, .modal-body::-webkit-scrollbar-track { background: transparent; }
+  #dayList { scrollbar-width: thin; scrollbar-color: #d8cfbd transparent; }
 
   /* ===== Topbar ===== */
   #topbar {
@@ -101,18 +103,18 @@
   #searchInput:focus { border-color: var(--accent); }
   #searchResults {
     position: absolute;
-    top: 40px; left: 0; right: 0;
+    top: 42px; left: 0; right: 0;
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: 0 4px 16px rgba(0,0,0,.15);
-    max-height: 300px;
+    box-shadow: var(--shadow-lg);
+    max-height: 320px;
     overflow-y: auto;
     display: none;
     z-index: 1200;
+    padding: 4px;
   }
-  .search-item { padding: 10px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border); }
-  .search-item:last-child { border-bottom: none; }
+  .search-item { padding: 9px 11px; font-size: 13px; cursor: pointer; border-radius: 8px; transition: background var(--dur) var(--ease); }
   .search-item:hover { background: var(--accent-soft); }
   .search-item .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .dict-badge {
@@ -142,6 +144,9 @@
   }
   .btn:hover { background: var(--accent-soft); border-color: var(--accent); }
   .btn:active { transform: scale(.97); }
+  /* 無可復原時的淡化狀態（仍可點，只是視覺弱化） */
+  .btn.is-disabled { opacity: .4; }
+  .btn.is-disabled:hover { background: var(--panel); border-color: var(--border); }
   .btn.primary {
     background: linear-gradient(180deg, #54796b, var(--accent));
     color: #fff; border-color: var(--accent);
@@ -163,14 +168,15 @@
     z-index: 1000;
   }
   #sidebarHeader {
-    padding: 10px 12px;
+    padding: 12px 12px 10px;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
+    gap: 8px;
     justify-content: space-between;
   }
-  #sidebarHeader .title { font-size: 14px; font-weight: 700; }
-  #dayList { flex: 1; overflow-y: auto; padding: 10px; }
+  #sidebarHeader .title { font-size: 15px; font-weight: 700; font-family: var(--serif); letter-spacing: .5px; margin-right: auto; }
+  #dayList { flex: 1; overflow-y: auto; padding: 12px 12px 4px; }
 
   .day-card {
     position: relative;
@@ -191,21 +197,24 @@
   }
   .day-card.active { border-color: var(--day-c, var(--accent)); box-shadow: 0 6px 18px rgba(71,105,92,.16); }
   .day-header {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 11px 11px 10px 15px;
+    padding: 10px 12px 8px;
     cursor: pointer;
     user-select: none;
     transition: background var(--dur) var(--ease);
-    flex-wrap: wrap;
     /* 當日色的極淡漸層底，讓每天有專屬氣質 */
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--day-c, var(--accent)) 9%, transparent), transparent);
   }
-  .day-header .day-meta { flex-basis: 100%; order: 10; padding-left: 32px; font-size: 11.5px; margin-top: 2px; letter-spacing: .3px; }
-  .day-header .day-name { min-width: 90px; }
   .day-header:hover { background: linear-gradient(180deg, color-mix(in srgb, var(--day-c, var(--accent)) 15%, transparent), transparent); }
+  .day-title-row { display: flex; align-items: center; gap: 9px; }
+  .day-sub-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin-top: 6px; padding-left: 31px;
+  }
+  .day-btns { display: flex; align-items: center; gap: 1px; flex-shrink: 0;
+    opacity: .5; transition: opacity var(--dur) var(--ease); }
+  .day-card:hover .day-btns, .day-card.active .day-btns { opacity: 1; }
+  .day-btns .icon-btn { min-width: 26px; min-height: 26px; }
   .day-color-dot {
     width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0;
     background: var(--day-c, var(--accent));
@@ -244,6 +253,8 @@
   @media (pointer: coarse) {
     .icon-btn { min-width: 40px; min-height: 40px; }
     .icon-btn svg { width: 17px; height: 17px; }
+    .day-btns { opacity: 1; }   /* 觸控無 hover，天操作圖示恆亮 */
+    .day-btns .icon-btn { min-width: 34px; min-height: 34px; }
   }
 
   .stop-list { list-style: none; padding: 4px 0 2px; }
@@ -1078,9 +1089,14 @@ function dayDateLabel(di) {
 
 /* ============ 復原（Undo） ============ */
 const undoStack = [];
+function refreshUndoBtn() {
+  const b = document.getElementById('undoBtn');
+  if (b) b.classList.toggle('is-disabled', undoStack.length === 0);
+}
 function pushUndo() {
   undoStack.push(JSON.stringify({ days: state.days, activeDayId: state.activeDayId }));
   if (undoStack.length > 30) undoStack.shift();
+  refreshUndoBtn();
 }
 function undo() {
   if (!undoStack.length) { toast('沒有可復原的動作'); return; }
@@ -1089,7 +1105,8 @@ function undo() {
   state.activeDayId = snap.activeDayId;
   if (!state.days.find(d => d.id === state.activeDayId)) state.activeDayId = state.days[0] ? state.days[0].id : null;
   saveState(); renderAll();
-  toast('↩️ 已復原');
+  refreshUndoBtn();
+  toast('已復原');
 }
 
 /* ============ 渲染：地圖 ============ */
@@ -1166,7 +1183,11 @@ function wirePopupNote(mk, stop, day) {
   ta.dataset.wired = '1';
   const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'; };
   grow();
-  ta.addEventListener('focus', () => { editingNoteStopId = stop.id; });
+  ta.addEventListener('focus', () => {
+    editingNoteStopId = stop.id;
+    // 手機：把地圖往上帶，避免彈出的鍵盤蓋住備註框
+    if (window.innerWidth <= 760) setTimeout(() => map.panBy([0, -140], { animate: true }), 60);
+  });
   ta.addEventListener('input', () => { editingNoteStopId = stop.id; stop.note = ta.value; grow(); saveState(); });  // saveState 不重繪，打字順暢
   ta.addEventListener('blur', () => {
     if (editingNoteStopId === stop.id) editingNoteStopId = null;
@@ -1407,13 +1428,19 @@ function renderSidebar() {
     const header = document.createElement('div');
     header.className = 'day-header';
     header.innerHTML = `
-      <span class="day-color-dot" title="點擊換顏色">${di + 1}</span>
-      <input class="day-name" value="${esc(day.name)}" title="點擊改名">
-      <span class="day-meta">${dayDateLabel(di)}<span class="meta-count">${day.stops.length} 站</span></span>
-      <button class="icon-btn" data-act="vis" title="${day.visible ? '隱藏這一天' : '顯示這一天'}" aria-label="${day.visible ? '隱藏這一天' : '顯示這一天'}">${day.visible ? ICONS.eye : ICONS.eyeOff}</button>
-      <button class="icon-btn" data-act="up" title="上移" aria-label="這一天往前移">${ICONS.up}</button>
-      <button class="icon-btn" data-act="down" title="下移" aria-label="這一天往後移">${ICONS.down}</button>
-      <button class="icon-btn danger" data-act="del" title="刪除這一天" aria-label="刪除這一天">${ICONS.x}</button>
+      <div class="day-title-row">
+        <span class="day-color-dot" title="點擊換顏色">${di + 1}</span>
+        <input class="day-name" value="${esc(day.name)}" title="點擊改名" aria-label="第 ${di + 1} 天名稱">
+      </div>
+      <div class="day-sub-row">
+        <span class="day-meta">${dayDateLabel(di)}<span class="meta-count">${day.stops.length} 站</span></span>
+        <span class="day-btns">
+          <button class="icon-btn" data-act="vis" title="${day.visible ? '隱藏這一天' : '顯示這一天'}" aria-label="${day.visible ? '隱藏這一天' : '顯示這一天'}">${day.visible ? ICONS.eye : ICONS.eyeOff}</button>
+          <button class="icon-btn" data-act="up" title="上移" aria-label="這一天往前移">${ICONS.up}</button>
+          <button class="icon-btn" data-act="down" title="下移" aria-label="這一天往後移">${ICONS.down}</button>
+          <button class="icon-btn danger" data-act="del" title="刪除這一天" aria-label="刪除這一天">${ICONS.trash}</button>
+        </span>
+      </div>
     `;
     header.addEventListener('click', e => {
       if (e.target.closest('.icon-btn') || e.target.classList.contains('day-name') || e.target.classList.contains('day-color-dot')) return;
@@ -1653,6 +1680,11 @@ function addStop(lat, lng, name) {
   if (localStorage.getItem('trip-map-planner-tools-collapsed') === null) {
     const tot = state.days.reduce((n, d) => n + d.stops.length, 0);
     if (tot === 3) setToolsCollapsed(false, false);
+  }
+  // 一次性提示：第一次同一天有 2 站時，告知可拖曳序號排序
+  if (day.stops.length === 2 && !localStorage.getItem('trip-map-planner-drag-hint')) {
+    try { localStorage.setItem('trip-map-planner-drag-hint', '1'); } catch (e) {}
+    setTimeout(() => toast('💡 拖曳站點左側的數字圓圈，可調整順序'), 2600);
   }
   track('add_stop');
 }
@@ -2075,6 +2107,7 @@ document.addEventListener('keydown', e => {
 });
 document.getElementById('undoBtn').addEventListener('click', undo);
 document.getElementById('undoBtn').setAttribute('aria-label', '復原上一步');
+refreshUndoBtn();
 
 /* ============ 出發日期 ============ */
 const startDateInput = document.getElementById('startDate');
