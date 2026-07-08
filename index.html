@@ -498,6 +498,13 @@
     color: var(--text);
     background: #fff;
   }
+  /* 「已自動儲存」即時提示：存檔時淡入、稍後淡出 */
+  .save-status {
+    font-size: 11.5px; color: #12b76a; font-weight: 600;
+    opacity: 0; transition: opacity var(--dur) var(--ease);
+    white-space: nowrap; margin-left: 8px;
+  }
+  .save-status.show { opacity: 1; }
 
   .day-footer {
     display: flex; align-items: center; gap: 6px;
@@ -805,6 +812,11 @@
   .booking-row .br-cta:hover { background: #a05e3a; }
   .booking-foot { padding: 10px 18px 16px; font-size: 11px; color: var(--muted); line-height: 1.6; }
   .booking-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 20px 0; }
+  .share-privacy {
+    background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+    border-radius: 10px; padding: 9px 12px; margin-bottom: 14px;
+    font-size: 12.5px; color: var(--accent-strong); line-height: 1.6;
+  }
   .share-section { padding: 4px 0 14px; }
   .share-section + .share-section { border-top: 1px solid var(--border); padding-top: 14px; }
   .share-section h3 { font-size: 14.5px; margin-bottom: 4px; }
@@ -1100,7 +1112,8 @@
     <div id="dateRow">
       <span>出發日期</span>
       <input type="date" id="startDate">
-      <span id="dateRowHint" style="flex:1;text-align:right"></span>
+      <span id="saveStatus" class="save-status" aria-live="polite"></span>
+      <span id="dateRowHint" style="margin-left:auto;text-align:right"></span>
     </div>
     <div id="dayList"></div>
     <div id="toolsPanel">
@@ -1174,6 +1187,7 @@
       <button class="icon-btn" id="shareModalClose" title="關閉" aria-label="關閉" style="font-size:18px">✕</button>
     </div>
     <div class="modal-body">
+      <div class="share-privacy">🔒 免登入。只有<b>拿到連結的人</b>能打開，不會公開、也搜尋不到。你決定要傳給誰。</div>
       <div class="share-section">
         <h3>📤 分享唯讀副本</h3>
         <p class="desc">把目前的行程打包成一條連結。朋友打開會載入一份<b>副本</b>，他改他的、你的不會動。行程全部壓縮在連結裡，不會上傳到任何伺服器。</p>
@@ -1365,9 +1379,19 @@ const overlay = L.layerGroup().addTo(map);
 
 /* ============ 工具函式 ============ */
 function uid() { return Math.random().toString(36).slice(2, 10); }
+let _savedFlashTimer;
+function flashSaved() {
+  const el = document.getElementById('saveStatus');
+  if (!el) return;
+  el.textContent = '✓ 已自動儲存';
+  el.classList.add('show');
+  clearTimeout(_savedFlashTimer);
+  _savedFlashTimer = setTimeout(() => el.classList.remove('show'), 1600);
+}
 function saveState() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
   if (window.SyncEngine && window.SyncEngine.active) window.SyncEngine.schedulePush();
+  flashSaved();
 }
 function loadState() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
