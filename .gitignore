@@ -1,5 +1,0 @@
-# 私人行程資料，不要放上公開 repo
-data/
-
-# FTP 憑證（本機專用，勿進 git）
-ftp-config.local.json

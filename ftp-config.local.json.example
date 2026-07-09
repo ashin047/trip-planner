@@ -1,7 +1,0 @@
-{
-  "_說明": "複製這個檔案改名為 ftp-config.local.json，填入你的 FTP 資訊（該檔已被 .gitignore 排除，不會進 git）",
-  "host": "ftp.shinshing.tw 或主機商給的 FTP 位址",
-  "user": "你的 FTP 帳號",
-  "password": "你的 FTP 密碼",
-  "remoteDir": "public_html/planner"
-}
