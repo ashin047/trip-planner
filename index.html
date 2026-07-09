@@ -1878,9 +1878,18 @@ function openStopMenu(btn, day, stop, si) {
   });
 }
 
+/* 預設格式的天名（Day N 或 Day N xxx）在增刪搬動後自動重編號；自訂名稱不動 */
+function renumberDays() {
+  state.days.forEach((d, i) => {
+    const m = /^Day\s*\d+(\s.*)?$/.exec(d.name || '');
+    if (m) d.name = `Day ${i + 1}${m[1] || ''}`;
+  });
+}
+
 /* 天層級「⋯」選單（顯示/隱藏、排序、刪除，收斂工具感） */
 function openDayMenu(btn, day, di) {
   const rows = [];
+  rows.push(`<button class="sm-item" data-dm="insert"><span class="sm-arrow">＋</span><span>在這天後面插入一天</span></button>`);
   if (day.stops.length) rows.push(`<button class="sm-item" data-dm="fit">${ICONS.locate}<span>縮放至此日</span></button>`);
   rows.push(`<button class="sm-item" data-dm="vis">${day.visible ? ICONS.eye : ICONS.eyeOff}<span>${day.visible ? '在地圖上隱藏這天' : '在地圖上顯示這天'}</span></button>`);
   if (di > 0) rows.push(`<button class="sm-item" data-dm="up"><span class="sm-arrow">↑</span><span>這天往前移</span></button>`);
@@ -1901,12 +1910,20 @@ function openDayMenu(btn, day, di) {
       e.stopPropagation();
       const act = item.dataset.dm;
       closeStopMenu();
-      if (act === 'fit') {
+      if (act === 'insert') {
+        pushUndo();
+        const nd = { id: uid(), name: `Day ${di + 2}`, color: dayColorAt(state.days.length), visible: true, stops: [] };
+        state.days.splice(di + 1, 0, nd);
+        state.activeDayId = nd.id;
+        renumberDays();
+        saveState(); renderAll();
+        toast(`已在「${day.name}」後面插入新的一天`);
+      } else if (act === 'fit') {
         map.fitBounds(L.latLngBounds(day.stops.map(s => [s.lat, s.lng])), { padding: [50, 50] });
         if (window.innerWidth <= 760) document.getElementById('sidebar').classList.remove('open');
       } else if (act === 'vis') { day.visible = !day.visible; saveState(); renderAll(); }
-      else if (act === 'up') { if (di > 0) { pushUndo(); state.days.splice(di, 1); state.days.splice(di - 1, 0, day); saveState(); renderAll(); } }
-      else if (act === 'down') { if (di < state.days.length - 1) { pushUndo(); state.days.splice(di, 1); state.days.splice(di + 1, 0, day); saveState(); renderAll(); } }
+      else if (act === 'up') { if (di > 0) { pushUndo(); state.days.splice(di, 1); state.days.splice(di - 1, 0, day); renumberDays(); saveState(); renderAll(); } }
+      else if (act === 'down') { if (di < state.days.length - 1) { pushUndo(); state.days.splice(di, 1); state.days.splice(di + 1, 0, day); renumberDays(); saveState(); renderAll(); } }
       else if (act === 'del') {
         if (day.stops.length && !confirm(`確定刪除「${day.name}」？裡面有 ${day.stops.length} 個地點。`)) return;
         pushUndo();
@@ -1914,6 +1931,7 @@ function openDayMenu(btn, day, di) {
         if (state.activeDayId === day.id) state.activeDayId = state.days[0] ? state.days[0].id : null;
         delete routeCache[day.id];
         collapsedDays.delete(day.id);
+        renumberDays();
         saveState(); renderAll();
       }
     });
@@ -2160,6 +2178,7 @@ function addStop(lat, lng, name, type) {
     state.activeDayId = day.id;
   }
   if (!day.visible) day.visible = true; // 加點時自動顯示該天，避免「加了卻看不到」
+  if (collapsedDays.has(day.id)) { collapsedDays.delete(day.id); saveCollapsed(); } // 收合中的天自動展開，讓新站的高亮看得到
   const newStop = { id: uid(), name: name || `地點 ${day.stops.length + 1}`, lat: +lat.toFixed(6), lng: +lng.toFixed(6), note: '', type: type || '📍' };
   day.stops.push(newStop);
   delete routeCache[day.id];
@@ -2995,7 +3014,7 @@ function buildBookingList() {
   const acts = [], seen = new Set();
   days.forEach(d => d.stops.forEach(s => { if (s.type === '🎯' && !seen.has(s.name)) { seen.add(s.name); acts.push(s.name); } }));
   if (acts.length) {
-    secs.push({ title: '🎯 活動票券', count: `${acts.length} 項`, rows: acts.slice(0, 15).map(name => ({
+    secs.push({ title: '🎯 活動票券', count: acts.length > 40 ? `${acts.length} 項（列前 40）` : `${acts.length} 項`, rows: acts.slice(0, 40).map(name => ({
       title: name, sub: '找票券／體驗', aff: 'kkday',
       href: `https://www.kkday.com/zh-tw/search?keyword=${encodeURIComponent(name)}&cid=19977`, cta: '找票券'
     }))});

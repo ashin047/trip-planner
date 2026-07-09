@@ -1,41 +1,49 @@
 # 行程路線規劃器（公開版）
 
-單一 `index.html` 檔案、零後端、零建置——上傳到任何靜態空間就能跑。
+單一 `index.html` 檔案、零建置——上傳到任何靜態空間就能跑。
+線上版：https://ashin047.github.io/trip-planner/
 
-## 部署方式（擇一）
+## 更新部署
 
-1. **shinshing.tw 子目錄（建議）**：FTP 把 `index.html` 上傳到 `public_html/planner/`（或任何子目錄），網址即 `https://shinshing.tw/planner/`。跟主站同網域，GA4、品牌、SEO 都加分。
-2. **Cloudflare Pages / GitHub Pages / Netlify**：把 `trip-map-planner/` 資料夾丟上去即可。
+- **GitHub Pages（現行）**：改完 `index.html` 後執行 `deploy.ps1`（git push，1–2 分鐘生效）。
+- **shinshing.tw 子目錄（規劃中）**：填好 `ftp-config.local.json`（複製 `.example`）後執行 `deploy-shinshing.ps1`。
+- `data/star-travel-8days.json` 是阿新私人行程，被 `.gitignore` 排除，公開 repo 沒有它。
 
-`data/star-travel-8days.json` 是阿新自己的行程資料，**公開部署時可以不上傳**（不影響工具運作）。
+## 架構速覽
 
-## 啟用使用人數統計（GA4）
+- **地圖**：Leaflet；底圖預設 CARTO light（英文地名），可切 Google 圖磚（mt*.google.com，免 key）。
+- **路線**：OSRM（免費公服）計算開車段；`✈️` 類型站的前一段畫虛線不計里程；`osrmFetch` 佇列同時上限 4 個請求。
+- **搜尋**：內建 `NZ_POI` 紐西蘭景點中文字典（含機場/租車點，「精選」置頂）→ Nominatim 全球搜尋（NZ 優先、國旗標示）。字典比中規則：城市別名需佔查詢 ≥60% 才置頂，避免蓋掉店家。
+- **分享**：`#trip=`（LZ 壓縮進網址、零後端）；**共編** `#sync=`（Firebase RTDB `trip-planner-sync-5ca5c`，asia-southeast1，規則只允許單筆 `/trips/$id` 讀寫）。
+- **儲存**：localStorage 即時自動存＋「行程版本」快照；收合狀態存 `trip-map-planner-collapsed`（不進行程資料）。
 
-打開 `index.html`，搜尋 `SITE_CONFIG`，把 GA4 評估 ID 填進去：
+## GA4 統計
 
-```js
-const SITE_CONFIG = {
-  analyticsId: 'G-XXXXXXXXXX'   // ← 填這裡；留空 = 完全不載入追蹤
-};
-```
-
-建議在 GA4 建一個獨立的資料串流（或沿用 shinshing.tw 的 property 加一個串流）。已內建的自訂事件：
+`SITE_CONFIG.analyticsId = 'G-7LD9T7TJBX'`（資源「紐西蘭旅遊攻略」→ 串流「行程規劃器 trip-planner」）。
 
 | 事件 | 意義 |
 |---|---|
-| `planner_loaded` | 工具被打開（看使用人數） |
-| `add_stop` | 使用者加了地點（看活躍度） |
-| `export_kml` / `copy_text` | 匯出行為（重度使用者） |
-| `affiliate_click`（帶 `platform` 參數） | 聯盟連結點擊——**看哪個平台最會賺** |
+| `planner_loaded` | 工具被打開 |
+| `demo_loaded` / `welcome_start_blank` | 入門路徑選擇 |
+| `share_created` / `share_opened` / `sync_created` / `sync_joined` | 分享與共編 |
+| `booking_list_open` | 一鍵預訂清單開啟 |
+| `affiliate_click`（`partner`＋`cta_position` 參數） | 聯盟點擊——對齊資源既有自訂維度，與 shinshing.tw 部落格同一套報表 |
 
 ## 聯盟連結維護
 
-- 工具箱九條連結在 `index.html` 搜尋 `toolsGrid`；追蹤碼 source of truth 是 repo 的 `affiliate-config/*.json`，改碼時兩邊要同步。
-- 情境式連結（搜尋 `affLink`）：🛏️ 住宿站 popup → Booking 搜尋（label=`shin-planner-stay`）；🎯 活動站 popup → KKday 搜尋。
-- 全部已帶 `rel="sponsored nofollow noopener"`，側欄有揭露聲明。
+追蹤碼 source of truth：repo 根目錄 `affiliate-config/*.json`，改碼時同步 `index.html`。
 
-## 公開流量的注意事項（免費服務的限制）
+| 觸點 | 位置（搜尋關鍵字） | Booking label |
+|---|---|---|
+| 工具箱 9 平台 | `toolsGrid` | `shin-planner-tools` |
+| 住宿站彈窗「查 M/D 空房」 | `bookingStayUrl` | `shin-planner-stay-popup` |
+| 每日 footer「訂 M/D 住宿」 | `bookingStayUrl` | `shin-planner-stay-day` |
+| 一鍵預訂清單（機票/逐晚住宿/租車/eSIM/活動） | `buildBookingList` | `shin-planner-stay-list` |
 
-- **Google 圖磚**：目前直接用 `mt*.google.com` 圖磚端點（免 API key），嚴格說不在 Google 官方條款保障內。個人工具沒問題；若流量做大或要放廣告，建議改用 MapTiler／Thunderforest（有免費額度）或正式申請 Google Maps JS API。改底圖只要動 `setBaseLayer()` 一個函式。
-- **OSRM 路線**（router.project-osrm.org）與 **Nominatim 搜尋**：都是社群免費服務，有流量禮儀限制（Nominatim 約 1 req/s）。搜尋已做 500ms 防抖；若日活躍破千再考慮自架或換付費 API。
-- 使用者行程存在**各自瀏覽器的 localStorage**，互不相通、也不會傳到伺服器——隱私聲明可以直接這樣寫。
+住宿深連結自動帶「地點＋checkin/checkout（依出發日推算）＋2 人」。全部 `rel="sponsored nofollow noopener"`，側欄與清單皆有揭露聲明。
+
+## 免費服務限制
+
+- Google 圖磚端點嚴格說不在官方條款保障內；流量大時改 MapTiler/Thunderforest 或正式 API（只動 `setBaseLayer()`）。
+- OSRM／Nominatim 為社群服務：搜尋已 500ms 防抖、路線已佇列節流；日活躍破千再考慮自架。
+- 行程存在使用者各自瀏覽器，不上傳伺服器（共編除外，存 Firebase、僅知道連結者可讀寫）。
