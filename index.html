@@ -180,6 +180,7 @@
   }
   .search-item { display: flex; align-items: center; gap: 8px; padding: 8px 9px 8px 11px; font-size: 13px; cursor: pointer; border-radius: 8px; transition: background var(--dur) var(--ease); }
   .search-item:hover { background: var(--accent-soft); }
+  .search-item.kb-focus { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
   .search-item.search-loading { color: var(--muted); cursor: default; }
   .search-item.search-loading:hover { background: transparent; }
   .search-item .si-body { flex: 1; min-width: 0; }
@@ -226,8 +227,8 @@
   .btn:hover { background: var(--accent-soft); border-color: var(--accent); }
   .btn:active { transform: scale(.97); }
   /* 無可復原時的淡化狀態（仍可點，只是視覺弱化） */
-  .btn.is-disabled { opacity: .4; }
-  .btn.is-disabled:hover { background: var(--panel); border-color: var(--border); }
+  .btn.is-disabled, .btn:disabled { opacity: .4; cursor: default; }
+  .btn.is-disabled:hover, .btn:disabled:hover { background: var(--panel); border-color: var(--border); }
   .btn.primary {
     background: linear-gradient(180deg, #54796b, var(--accent));
     color: #fff; border-color: var(--accent);
@@ -497,6 +498,20 @@
     font-family: inherit;
     color: var(--text);
     background: #fff;
+  }
+  /* 一次性提示：加了第一站但還沒設出發日期 → 點亮日期欄 */
+  #dateRow.nudge { background: color-mix(in srgb, var(--accent2) 10%, #f6f2e9); }
+  #dateRow.nudge input[type="date"] {
+    border-color: var(--accent2);
+    animation: nudgePulse 1.6s ease-in-out 3;
+  }
+  #dateRow.nudge #dateRowHint { color: var(--accent2); font-weight: 600; }
+  @keyframes nudgePulse {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent2) 30%, transparent); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #dateRow.nudge input[type="date"] { animation: none; }
   }
   /* 「已自動儲存」即時提示：存檔時淡入、稍後淡出 */
   .save-status {
@@ -1312,7 +1327,7 @@ const ICONS = {
 };
 
 /* ============ 公開版設定 ============ */
-const APP_VER = '2026.07.08c';   // 每次部署遞增；給回饋時請附上左下角版本號
+const APP_VER = '2026.07.09a';   // 每次部署遞增；給回饋時請附上左下角版本號
 const SITE_CONFIG = {
   // GA4 評估 ID（資源「紐西蘭旅遊攻略」→ 串流「行程規劃器 trip-planner」）；留空 = 不載入任何追蹤
   analyticsId: 'G-7LD9T7TJBX',
@@ -1455,7 +1470,10 @@ function bookingStayUrl(place, di, posLabel) {
 const undoStack = [];
 function refreshUndoBtn() {
   const b = document.getElementById('undoBtn');
-  if (b) b.classList.toggle('is-disabled', undoStack.length === 0);
+  if (!b) return;
+  const empty = undoStack.length === 0;
+  b.disabled = empty;
+  b.classList.toggle('is-disabled', empty);
 }
 function pushUndo() {
   undoStack.push(JSON.stringify({ days: state.days, activeDayId: state.activeDayId }));
@@ -2190,6 +2208,19 @@ function addStop(lat, lng, name, type) {
   // 加了第一站後，搜尋框改成引導繼續加下一站
   const si = document.getElementById('searchInput');
   if (si) si.placeholder = '繼續搜尋下一個地點加入行程…';
+  // 還沒設出發日期 → 一次性提示（日期能解鎖「訂房連結自動帶入住日」）
+  if (!state.startDate && !localStorage.getItem('trip-map-planner-date-nudge')) {
+    try { localStorage.setItem('trip-map-planner-date-nudge', '1'); } catch (e) {}
+    const dr = document.getElementById('dateRow');
+    const hint = document.getElementById('dateRowHint');
+    if (dr && hint) {
+      dr.classList.add('nudge');
+      hint.textContent = '📅 設定出發日期，訂房連結會自動帶入住日';
+      const clear = () => { dr.classList.remove('nudge'); refreshDateHint(); };
+      document.getElementById('startDate').addEventListener('change', clear, { once: true });
+      setTimeout(clear, 12000);
+    }
+  }
   // 名片高亮新站＋捲入視野（加入成功的明確回饋）
   const li = document.querySelector(`.stop-item[data-stopid="${newStop.id}"]`);
   if (li) {
@@ -2235,9 +2266,39 @@ const searchInput = document.getElementById('searchInput');
 const searchResults = document.getElementById('searchResults');
 let searchTimer = null;
 
+/* 鍵盤操作：↑↓ 在結果間移動，Enter 加入選取項（未選取＝第一筆）；打新字後 Enter 先重搜 */
+let kbIndex = -1;
+let lastSearchQ = '';
+function kbItems() {
+  return [...searchResults.querySelectorAll('.search-item')].filter(el => el.querySelector('.si-add'));
+}
+function kbHighlight(items) {
+  items.forEach((el, i) => el.classList.toggle('kb-focus', i === kbIndex));
+  if (items[kbIndex]) items[kbIndex].scrollIntoView({ block: 'nearest' });
+}
 searchInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.isComposing) { doSearch(searchInput.value.trim()); }
-  if (e.key === 'Escape') { searchResults.style.display = 'none'; }
+  if (e.isComposing) return;
+  const visible = searchResults.style.display === 'block';
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (!visible) return;
+    const items = kbItems();
+    if (!items.length) return;
+    e.preventDefault();
+    kbIndex = e.key === 'ArrowDown'
+      ? (kbIndex + 1) % items.length
+      : (kbIndex <= 0 ? items.length - 1 : kbIndex - 1);
+    kbHighlight(items);
+  } else if (e.key === 'Enter') {
+    const q = searchInput.value.trim();
+    if (visible && q === lastSearchQ) {
+      const items = kbItems();
+      const target = items[kbIndex] || items[0];
+      if (target) { target.querySelector('.si-add').click(); return; }
+    }
+    doSearch(q);
+  } else if (e.key === 'Escape') {
+    searchResults.style.display = 'none';
+  }
 });
 document.addEventListener('click', e => {
   if (!e.target.closest('#searchWrap')) searchResults.style.display = 'none';
@@ -2416,6 +2477,8 @@ function appendSearchItem(main, sub, lat, lng, zoom, isDict, type, flag) {
 
 function doSearch(q) {
   if (!q) return;
+  lastSearchQ = q;
+  kbIndex = -1;
   searchResults.innerHTML = '';
   searchResults.style.display = 'block';
   // 1) 內建紐西蘭景點字典（中文 OK、即時，永遠置頂）
