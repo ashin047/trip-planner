@@ -7,10 +7,10 @@
 <title>工具搬家囉｜行程路線規劃器</title>
 <link rel="canonical" href="https://shinshing.tw/planner/">
 <script>
-// 舊網址轉新家，連 #trip= / #sync= 分享參數一起帶過去
+// 舊網址轉新家，連 #trip= / #sync= 分享參數一起帶過去。
+// 不用 meta refresh：它帶不了 hash，還會跟這裡的轉跳賽跑把參數蓋掉
 location.replace('https://shinshing.tw/planner/' + location.search + location.hash);
 </script>
-<meta http-equiv="refresh" content="2;url=https://shinshing.tw/planner/">
 <style>
   body { font-family: "Noto Sans TC", sans-serif; background: #f5f1e8; color: #3d3a33;
          display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
